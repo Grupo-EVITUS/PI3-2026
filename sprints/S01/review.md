@@ -80,6 +80,7 @@ Link do repositório:
 
 ## 8. Próximos passos
 
-- 
-- 
-- 
+- Mapear jornada do usuário
+- Levantar necessidades dos usuários
+- Levantar requisitos funcionais
+- Levantar requisitos não funcionais

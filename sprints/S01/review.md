@@ -2,16 +2,16 @@
 
 ## Identificação
 
-Projeto:
-Sprint:
-Período:
-Data da Sprint Review:
+Projeto: SAA (Sistema de Ausencia de Alunos)
+Sprint: 01
+Período: 13/09/2026 a 19/09/2026
+Data da Sprint Review: 19/09/2026
 
 ## 1. Sprint Goal
 
-Objetivo da Sprint:
+Objetivo da Sprint: Identificar o publico alvo, principais dores, responsáveis
 
-> Descrever o resultado que pretendíamos alcançar.
+> Foi identificado que o sistema será utilizado para auxiliar a atividade da AOE da escola para facilitar o envio de notificações de faltas aos Pais dos alunos
 
 ---
 
@@ -21,14 +21,14 @@ Objetivo da Sprint:
 
 | Item | Descrição | Status | DoD atendida? |
 |---|---|---|---|
-| SAA-1 | | Concluído | Sim |
-| US-02 | | Concluído | Sim |
+| SAA-1 |Identificação da dor do cliente | Concluído | Sim |
+| SAA-2 | | Iniciado | Sim |
 
 ### Itens não concluídos
 
 | Item | Motivo | Próxima ação |
 |---|---|---|
-| US-03 | | |
+|  | | |
 
 ---
 
@@ -56,9 +56,9 @@ Link do repositório:
 
 ## 5. Novas necessidades identificadas
 
-- 
-- 
-- 
+- Identificado a necessidade de push notification para envio de alertas de faltas
+- Necessidade de quantidade de envio de mensagens
+- Uso do sistema pelo AOE cadastrando as faltas para envio das mensagens
 
 ---
 

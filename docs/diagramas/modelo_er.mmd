@@ -1,0 +1,111 @@
+erDiagram
+    ACADEMIC_PERIODS ||--o{ CLASSES : "possui"
+    ACADEMIC_PERIODS ||--o{ ENROLLMENTS : "vigencia"
+    STUDENTS ||--o{ ENROLLMENTS : "matriculas"
+    CLASSES ||--o{ ENROLLMENTS : "recebe"
+    STUDENTS }o--o{ GUARDIANS : "vinculo embutido em students.guardians"
+    ENROLLMENTS ||--o{ ATTENDANCE_RECORDS : "frequencia do vinculo"
+    STUDENTS ||--o{ ATTENDANCE_RECORDS : "frequencia diaria"
+    CLASSES ||--o{ ATTENDANCE_RECORDS : "turma do dia (copia)"
+    ATTENDANCE_RECORDS ||--o{ EMAIL_NOTIFICATIONS : "comunicados"
+    GUARDIANS ||--o{ EMAIL_NOTIFICATIONS : "destinatario"
+    USERS ||--o{ ATTENDANCE_RECORDS : "registered_by"
+    USERS ||--o{ EMAIL_NOTIFICATIONS : "created_by"
+    USERS ||--o{ AUDIT_EVENTS : "actor_user_id"
+    USERS ||--o{ PASSWORD_RESETS : "user_id"
+
+    USERS {
+        ObjectId _id PK
+        string email_normalized UK
+        string password_hash
+        string profile
+        bool active
+    }
+    STUDENTS {
+        ObjectId _id PK
+        string student_code UK
+        string name
+        date birth_date
+        array guardians "embutido, ate 3"
+        bool active
+    }
+    GUARDIANS {
+        ObjectId _id PK
+        string name
+        string email_normalized UK
+        string email_status
+        string phone
+        bool active
+    }
+    ACADEMIC_PERIODS {
+        ObjectId _id PK
+        string name UK
+        date start_date
+        date end_date
+        object attendance_policy "embutido"
+        bool active "um ativo"
+    }
+    CLASSES {
+        ObjectId _id PK
+        ObjectId academic_period_id FK
+        string code "unico no periodo"
+        string name
+        string grade
+        string shift
+    }
+    ENROLLMENTS {
+        ObjectId _id PK
+        ObjectId student_id FK
+        ObjectId class_id FK
+        ObjectId academic_period_id FK
+        date start_date
+        date end_date
+        string end_reason
+        bool active "uma ativa por aluno"
+    }
+    ATTENDANCE_RECORDS {
+        ObjectId _id PK
+        ObjectId enrollment_id FK
+        ObjectId student_id FK
+        ObjectId class_id FK
+        string class_name "copia do dia"
+        date date "unico por aluno"
+        string status
+        object details "embutido"
+        object justification "embutido"
+    }
+    EMAIL_NOTIFICATIONS {
+        ObjectId _id PK
+        ObjectId attendance_id FK
+        ObjectId guardian_id FK
+        string recipient_email "copia"
+        string status
+        int attempts "0 a 3"
+        object justification_link "hash do token"
+        array events "ate 30"
+    }
+    AUDIT_EVENTS {
+        ObjectId _id PK
+        date at
+        ObjectId actor_user_id FK
+        string action
+        string entity_type
+    }
+    PASSWORD_RESETS {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string token_hash UK
+        date expires_at
+        date created_at "TTL 30 dias"
+    }
+    LOGIN_ATTEMPTS {
+        ObjectId _id PK
+        string key
+        date at "TTL 1 hora"
+    }
+    MESSAGE_TEMPLATES {
+        ObjectId _id PK
+        string code UK
+        string subject
+        string body
+    }

@@ -1,6 +1,21 @@
+# Dependências
+/vendor/
 node_modules/
-*.log
-.DS_Store
-.vscode/
-var/
+
+# Ambiente e segredos (RNF-14: nenhuma credencial é versionada)
 .env
+.env.*
+!.env.example
+
+# Dados locais, logs e caches
+/var/
+*.log
+.phpunit.cache/
+.phpunit.result.cache
+/coverage/
+
+# Editor / sistema operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

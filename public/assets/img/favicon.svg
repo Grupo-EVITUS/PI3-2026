@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SAA — favicon (marca em traço mais grosso para ler bem em 16px). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect width="48" height="48" rx="12" fill="#24376b"/>
+  <path d="M29.73 13.49A7 7 0 1 0 24 24.5A7 7 0 1 1 18.27 35.52" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="36.5" cy="12" r="3.6" fill="#4b91ea"/>
+</svg>

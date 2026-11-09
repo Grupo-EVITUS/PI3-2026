@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SAA — marca gráfica (original): um "S" de traço contínuo com um ponto de aviso, sobre azul-marinho. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-labelledby="saa-mark-title">
+  <title id="saa-mark-title">SAA — Sistema de Ausência de Alunos</title>
+  <defs>
+    <linearGradient id="saa-mark-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2c4a96"/>
+      <stop offset="1" stop-color="#192b5a"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#saa-mark-bg)"/>
+  <path d="M29.73 13.49A7 7 0 1 0 24 24.5A7 7 0 1 1 18.27 35.52" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="36.5" cy="12" r="3.2" fill="#4b91ea"/>
+</svg>

@@ -1,0 +1,48 @@
+{
+    "name": "grupo-evitus/saa",
+    "description": "SAA — Sistema de Ausência de Alunos (PHP, HTML, CSS e MongoDB)",
+    "type": "project",
+    "keywords": ["escola", "frequencia", "ausencia", "php", "mongodb"],
+    "require": {
+        "php": ">=8.3",
+        "ext-mbstring": "*",
+        "ext-mongodb": "^2.2",
+        "ext-openssl": "*",
+        "mongodb/mongodb": "^2.2"
+    },
+    "require-dev": {
+        "ext-curl": "*",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Saa\\": "src/"
+        },
+        "files": [
+            "src/Core/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Saa\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --colors=always",
+        "test:unit": "phpunit --colors=always --testsuite Unit",
+        "test:integration": "phpunit --colors=always --testsuite Integration",
+        "test:acceptance": "phpunit --colors=always --testsuite Acceptance",
+        "db:init": "php bin/init_db.php",
+        "db:seed": "php bin/seed.php",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "php -S 127.0.0.1:8000 router.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

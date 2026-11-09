@@ -1,0 +1,16 @@
+# Normaliza finais de linha (o projeto roda em Windows, Linux e Docker).
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binários
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.pdf binary
+*.docx binary

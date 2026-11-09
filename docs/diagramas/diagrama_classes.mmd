@@ -1,0 +1,163 @@
+classDiagram
+    direction LR
+
+    class User {
+        +ObjectId _id
+        +string name
+        +string email_normalized
+        +string password_hash
+        +Profile profile
+        +bool active
+        +date last_login_at
+        +date password_changed_at
+    }
+    class Student {
+        +ObjectId _id
+        +string name
+        +string student_code
+        +date birth_date
+        +List~GuardianLink~ guardians
+        +bool active
+    }
+    class GuardianLink {
+        <<embutido>>
+        +ObjectId guardian_id
+        +Relationship relationship
+        +bool is_primary
+        +bool receives_absence_notifications
+    }
+    class Guardian {
+        +ObjectId _id
+        +string name
+        +string email_normalized
+        +EmailStatus email_status
+        +string phone
+        +bool active
+    }
+    class AcademicPeriod {
+        +ObjectId _id
+        +string name
+        +date start_date
+        +date end_date
+        +AttendancePolicy attendance_policy
+        +bool active
+    }
+    class AttendancePolicy {
+        <<embutido>>
+        +number min_attendance_percent
+        +number alert_below_percent
+    }
+    class ClassRoom {
+        +ObjectId _id
+        +ObjectId academic_period_id
+        +string code
+        +string name
+        +string grade
+        +Shift shift
+        +bool active
+    }
+    class Enrollment {
+        +ObjectId _id
+        +ObjectId student_id
+        +ObjectId class_id
+        +ObjectId academic_period_id
+        +date start_date
+        +date end_date
+        +EndReason end_reason
+        +bool active
+    }
+    class AttendanceRecord {
+        +ObjectId _id
+        +ObjectId enrollment_id
+        +ObjectId student_id
+        +ObjectId class_id
+        +string class_name
+        +date date
+        +AttendanceStatus status
+        +ObjectId registered_by
+        +AbsenceDetails details
+        +Justification justification
+    }
+    class AbsenceDetails {
+        <<embutido>>
+        +string source
+        +string note
+    }
+    class Justification {
+        <<embutido>>
+        +JustificationStatus status
+        +ObjectId guardian_id
+        +JustificationReason reason_code
+        +string explanation
+        +date submitted_at
+        +ObjectId notification_id
+        +List~StatusChange~ status_history
+    }
+    class StatusChange {
+        <<embutido>>
+        +JustificationStatus status
+        +date at
+        +ObjectId by_user_id
+        +ObjectId by_guardian_id
+    }
+    class EmailNotification {
+        +ObjectId _id
+        +ObjectId attendance_id
+        +ObjectId guardian_id
+        +string recipient_email
+        +string subject
+        +string body
+        +NotificationStatus status
+        +int attempts
+        +JustificationLink justification_link
+        +List~NotificationEvent~ events
+        +ObjectId resend_of
+    }
+    class JustificationLink {
+        <<embutido>>
+        +string token_hash
+        +date expires_at
+        +date used_at
+    }
+    class NotificationEvent {
+        <<embutido>>
+        +NotificationEventType type
+        +date occurred_at
+    }
+    class AuditEvent {
+        +date at
+        +ObjectId actor_user_id
+        +string action
+        +string entity_type
+        +object details
+    }
+    class PasswordReset {
+        +ObjectId user_id
+        +string token_hash
+        +date expires_at
+        +date used_at
+    }
+    class MessageTemplate {
+        +string code
+        +string subject
+        +string body
+        +List~string~ variables
+    }
+
+    Student "1" *-- "0..3" GuardianLink : guardians
+    GuardianLink "*" --> "1" Guardian : guardian_id
+    AcademicPeriod "1" *-- "1" AttendancePolicy
+    AcademicPeriod "1" <-- "*" ClassRoom : academic_period_id
+    Student "1" <-- "*" Enrollment : student_id
+    ClassRoom "1" <-- "*" Enrollment : class_id
+    Enrollment "1" <-- "*" AttendanceRecord : enrollment_id
+    AttendanceRecord "1" *-- "1" AbsenceDetails
+    AttendanceRecord "1" *-- "0..1" Justification
+    Justification "1" *-- "1..10" StatusChange
+    AttendanceRecord "1" <-- "*" EmailNotification : attendance_id
+    Guardian "1" <-- "*" EmailNotification : guardian_id
+    EmailNotification "1" *-- "1" JustificationLink
+    EmailNotification "1" *-- "0..30" NotificationEvent
+    User "1" <-- "*" AttendanceRecord : registered_by
+    User "1" <-- "*" AuditEvent : actor_user_id
+    User "1" <-- "*" PasswordReset : user_id

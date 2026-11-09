@@ -1,112 +1,136 @@
-# Sistema de Controle de Ausências e Justificativas
+# SAA — Sistema de Ausência de Alunos
 
-MVP web em **PHP, HTML e CSS** para registrar ausências escolares, comunicar os responsáveis por e-mail e acompanhar justificativas. O sistema tem telas específicas para a equipe, um formulário público por link individual e persistência relacional.
+Sistema web para a escola **registrar as ausências dos alunos, avisar os responsáveis por e-mail no mesmo dia e
+acompanhar as justificativas**. Feito em **PHP, HTML e CSS** com **MongoDB** (sem framework e sem CDN).
+
+Projeto Integrador do 3º semestre (PI3 2026) — Grupo EVITUS.
+
+## Situação
+
+O sistema está sendo entregue por etapas, uma por *milestone* do GitHub
+(detalhes em [docs/MAPA_ETAPAS.md](docs/MAPA_ETAPAS.md)):
+
+| Etapa | Milestone | Conteúdo | Situação |
+|:-:|---|---|---|
+| 1 | Sprint 4 – Arquitetura e Protótipos | arquitetura, modelagem MongoDB, design system, login e tela inicial | ✅ concluída |
+| 2 | Sprint 5 – MVP Funcional | cadastros (alunos, responsáveis, turmas, usuários), vínculos, API, e-mail, dados fictícios, Docker | em andamento |
+| 3 | Sprint 6 – Desenvolvimento Completo | registro de ausências, envio automático, justificativa, ocorrências, dashboard, perfis, recuperação de senha | planejada |
+| 4 | Sprint 7 – Homologação | testes funcionais, correções, homologação | planejada |
+| 5 | Entrega Final PI3 | documentação final e apresentação | planejada |
+
+O que já funciona hoje: login (com limite de tentativas), tela inicial, "meu perfil", matriz de perfis e permissões e
+a criação do banco (12 coleções com validação e índices).
 
 ## Requisitos
 
-- PHP 8.1 ou superior
-- Extensões PHP `PDO` e `pdo_sqlite`
+- **PHP 8.3 ou superior** com as extensões `mongodb` (2.x), `mbstring` e `openssl` (e `curl` para os testes)
+- **Composer** 2
+- **MongoDB 6 ou superior** — instalado no computador, em Docker ou no MongoDB Atlas (testado com 7.0)
 
-O MVP não depende de Composer, Node.js nem de um serviço de banco externo. O SQLite é criado automaticamente em `var/saa.sqlite3`, e a migração inicial está em `migrations/001_initial.sql`.
+### Habilitar a extensão `mongodb` no Windows
 
-## Executar localmente
+1. Descubra a versão do seu PHP: `php -v` (ex.: `PHP 8.5.3 (cli) ... NTS ... x64`).
+2. Baixe o zip correspondente na página de releases oficial do driver:
+   <https://github.com/mongodb/mongo-php-driver/releases> — arquivo
+   `php_mongodb-<versão>-<PHP 8.x>-nts-vs17-x86_64.zip` (use `ts` se o seu PHP for *Thread Safe*).
+3. Copie a DLL de dentro do zip para a pasta `ext` do PHP com o nome `php_mongodb.dll`.
+4. No `php.ini` (veja o caminho com `php --ini`), acrescente a linha `extension=mongodb`.
+5. Confira: `php -m | findstr mongodb` deve mostrar `mongodb`.
 
-No PowerShell, na raiz do repositório, abra dois terminais:
+> **Atenção com o PHP 8.5.3:** a DLL **2.5.6** não carrega nessa versão ("Não foi possível encontrar o procedimento
+> especificado"), porque foi compilada para um PHP 8.5.x mais novo. Use a **2.5.0**
+> (`php_mongodb-2.5.0-8.5-nts-vs17-x86_64.zip`) ou atualize o PHP.
 
-**Terminal 1 — aplicação web**
+No Linux: `sudo pecl install mongodb` e `extension=mongodb` no `php.ini` (ou o pacote `php-mongodb` da distribuição).
 
-```powershell
-php -S 127.0.0.1:8000 router.php
+### MongoDB
+
+Qualquer uma das opções:
+
+- **Instalado no Windows:** MongoDB Community Server (<https://www.mongodb.com/try/download/community>), que roda como
+  serviço em `mongodb://127.0.0.1:27017`.
+- **Docker:** `docker run -d --name saa-mongo -p 27017:27017 -v saa-mongo:/data/db mongo:7` (o `docker compose` completo
+  do projeto chega na Etapa 2).
+- **MongoDB Atlas** (gratuito): use a *connection string* `mongodb+srv://...` em `MONGODB_URI`.
+
+## Como executar
+
+```bash
+composer install
+cp .env.example .env          # no PowerShell: Copy-Item .env.example .env
 ```
 
-**Terminal 2 — fila de e-mails**
+Ajuste `MONGODB_URI` e `MONGODB_DB` no `.env` se precisar. Depois:
 
-```powershell
-php bin/process_mail_queue.php --watch
+```bash
+php bin/init_db.php           # cria coleções, validators e índices (pode rodar quantas vezes quiser)
+php bin/create_user.php --name "Administrador" --email admin@escola.local --profile ADMIN
+composer serve                # http://127.0.0.1:8000
 ```
 
-Acesse <http://127.0.0.1:8000>. Com `MAIL_MODE=log` (padrão), o worker registra os e-mails no log do PHP para desenvolvimento; não envia mensagens reais. Cada e-mail inclui o link individual da justificativa.
-
-### Usuários de demonstração
-
-| Perfil | E-mail | Senha |
-|---|---|---|
-| AOE | `aoe@escola.local` | `AOE12345!` |
-| Coordenação | `coordenacao@escola.local` | `Coord12345!` |
-| Diretor | `diretor@escola.local` | `Diretor12345!` |
-
-O seed de demonstração é ativado por padrão somente quando o banco ainda não contém usuários. Para uma instalação real, defina `SEED_DEMO=false`. Para criar a primeira conta de coordenação sem seed, use uma variável de ambiente segura para a senha:
+O `create_user.php` usa a senha da variável `INITIAL_USER_PASSWORD`; sem ela, gera uma senha forte e mostra **uma
+única vez**. Perfis: `ADMIN`, `COORDINATION`, `AOE`, `SECRETARY`.
 
 ```powershell
-$env:SEED_DEMO = "false"
-$env:INITIAL_USER_PASSWORD = "uma-senha-forte"
-php bin/create_user.php COORDENACAO "Nome da Coordenação" "coord@escola.org"
+# PowerShell: definindo a senha
+$env:INITIAL_USER_PASSWORD = "UmaSenhaForte!2026"
+php bin/create_user.php --name "Ana AOE" --email aoe@escola.local --profile AOE
 Remove-Item Env:INITIAL_USER_PASSWORD
 ```
 
-## Envio de e-mail
-
-O registro da ausência grava a ocorrência e as mensagens na fila local, sem aguardar o servidor de e-mail. O worker consome a fila e atualiza cada comunicação para `ENVIADO` ou `FALHA`; falhas podem ser reenviadas na tela de detalhes.
-
-Para produção, configure o servidor SMTP e execute o worker como serviço supervisionado:
-
-```powershell
-$env:MAIL_MODE = "smtp"
-$env:SMTP_HOST = "smtp.exemplo.org"
-$env:SMTP_PORT = "587"
-$env:SMTP_USERNAME = "usuario"
-$env:SMTP_PASSWORD = "senha"
-$env:SMTP_ENCRYPTION = "starttls" # starttls, ssl ou none
-$env:MAIL_FROM = "nao-responda@escola.org"
-$env:PUBLIC_BASE_URL = "https://presenca.escola.org"
-php bin/process_mail_queue.php --watch
-```
-
-Não salve segredos em arquivos versionados. Use o gerenciador de segredos do ambiente de hospedagem, HTTPS e `SESSION_COOKIE_SECURE=true` em produção.
-
-## Perfis e funcionalidades
-
-- **AOE:** registrar ausências, consultar ocorrências e reenviar comunicações com falha.
-- **Coordenação:** mesmos recursos da AOE, cadastros de turmas, alunos e responsáveis, vínculos entre responsáveis e alunos e criação de usuários internos.
-- **Diretor:** consulta de ocorrências e justificativas, sem operações de escrita.
-- **Responsável:** sem conta; responde por link individual de alta entropia enviado ao e-mail cadastrado.
-
-O MVP inclui cadastro/edição/arquivamento de turmas, alunos e responsáveis; registro de faltas de vários alunos da mesma turma; restrição de duplicidade por aluno/data; fila assíncrona; formulário público; painel filtrado por status; reenvio de falhas; e trilha de auditoria.
-
-Tokens são gerados aleatoriamente e armazenados como hash na tabela de comunicações. O link não expira na v1. Após o envio pela fila, o corpo da mensagem (que contém o token) é removido do registro de fila. A primeira justificativa recebida conclui a ocorrência; outros links passam a exibir somente a resposta já registrada.
-
-## Premissas adotadas
-
-- **P1:** a AOE registra as ausências; a Coordenação também pode registrá-las.
-- **P2:** usuários iniciais vêm do seed; a Coordenação pode criar novos usuários. Não há cadastro público de funcionários.
-- **P3:** o Diretor tem acesso de leitura equivalente ao painel da Coordenação.
-- **P4:** responsáveis não têm conta. O token do e-mail é a credencial; não expira na v1. A coluna `expires_at` já existe para evolução.
-- **P5:** se houver vários responsáveis, a primeira justificativa fecha a ocorrência.
-- **P6:** motivos iniciais: doença, consulta médica, problema familiar, problema de transporte e outro. A escola deve validar a lista.
-- **P7:** ausência é diária, não por aula/disciplina.
+Sem Composer no PATH, o servidor também sobe com `php -S 127.0.0.1:8000 router.php`. Em Apache (XAMPP/Laragon), aponte
+o *DocumentRoot* para `public/` (o `public/.htaccess` já encaminha as rotas para o `index.php`).
 
 ## Testes
 
-Execute os testes automatizados sem dependências extras:
-
-```powershell
-php tests/run.php
+```bash
+composer test                 # tudo
+composer test:unit            # sem banco
+composer test:integration     # contra o MongoDB (usa bancos temporários saa_test_*, apagados ao final)
+composer test:acceptance      # fluxos HTTP com o servidor embutido do PHP
 ```
 
-Os testes cobrem lote de ausências, bloqueio de duplicidade sem inserção parcial, fila de e-mail, token válido/inválido, motivo “Outro”, primeira resposta, impossibilidade de responder novamente e auditoria.
+Os testes de integração e aceitação usam `MONGODB_URI` (padrão `mongodb://127.0.0.1:27017`) e são **ignorados** se o
+MongoDB não estiver acessível — com `SAA_REQUIRE_MONGO=1` eles **falham** (é assim no CI). O GitHub Actions roda tudo
+a cada push com PHP 8.3, 8.4 e 8.5 e MongoDB 7 ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
-## Arquitetura e evolução
+## Estrutura
 
-- `public/index.php`: rotas HTTP e controles de perfil.
-- `src/Services.php`: validações e regras de negócio.
-- `src/Database.php` e `migrations/`: persistência, seed e esquema.
-- `src/MailQueue.php` e `bin/process_mail_queue.php`: outbox persistente e worker de envio.
-- `templates/` e `public/assets/app.css`: interface HTML/CSS responsiva.
+```text
+bin/        init_db.php, create_user.php (linha de comando)
+config/     rotas (config/routes/*.php) e menu (navigation.php)
+docs/       arquitetura, modelagem, design system, diagramas, requisitos e relatórios de etapa
+public/     index.php (ponto de entrada) e assets (CSS, JS, ícones)
+src/        Core (mini-framework), Controllers, Services, Models, Database, Domain, Security, Support
+tests/      Unit, Integration, Acceptance
+views/      templates PHP (layouts, parciais e telas)
+Sprint/     documentos de Sprint da equipe
+```
 
-O armazenamento usa SQLite para facilitar execução local e testes; as regras ficam isoladas dos templates e acessam os dados por PDO e consultas parametrizadas. Para produção com múltiplos servidores, recomenda-se migrar o esquema relacional para PostgreSQL e trocar a conexão por configuração de DSN.
+## Documentação
 
-## Fora do escopo da v1
+| Documento | Conteúdo |
+|---|---|
+| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | camadas, rotas, segurança, convenções e testes |
+| [docs/MODELAGEM_MONGODB.md](docs/MODELAGEM_MONGODB.md) | coleções, validators, índices, decisões e as 3 consultas frequentes |
+| [docs/DESIGN_SISTEMA.md](docs/DESIGN_SISTEMA.md) | paleta, contraste, componentes, estrutura do frontend e protótipos |
+| [docs/DIAGRAMA_DE_CLASSES.md](docs/DIAGRAMA_DE_CLASSES.md) | diagramas de classes (domínio e arquitetura) |
+| [docs/RNF.md](docs/RNF.md) | requisitos não funcionais e como cada um é verificado |
+| [docs/MAPA_ETAPAS.md](docs/MAPA_ETAPAS.md) | etapas × milestones e issues do GitHub |
+| [docs/etapas/](docs/etapas/) | relatório de cada etapa |
 
-Pesquisa avançada por aluno/turma/data, histórico detalhado por aluno, relatórios/gráficos, WhatsApp/SMS, aplicativo mobile, integrações institucionais e análise avançada. A estrutura de ocorrências, justificativas, serviços e logs permite adicionar essas capacidades em versões futuras sem introduzir esses recursos no MVP.
+## Premissas de negócio
 
-> O arquivo ZIP `saa_flask_mongodb_dashboard_atualizado.zip` e os diagramas existentes são materiais anteriores do repositório; esta versão executável do MVP está implementada em PHP.
+Herdadas do MVP anterior e mantidas (a escola deve validá-las):
+
+1. A ausência é **diária** (não por aula).
+2. A AOE registra as ausências; a coordenação também pode registrar.
+3. Responsáveis **não têm conta**: recebem um link individual e temporário por e-mail.
+4. Havendo vários responsáveis, a **primeira justificativa** encerra a ocorrência.
+5. Motivos: doença, consulta médica, problema familiar, problema de transporte e "outro" (com explicação obrigatória).
+6. Falta justificada continua contando como falta nos indicadores.
+
+## Histórico
+
+A primeira versão executável (PHP + SQLite) está no histórico da branch `main` (commit `260a850`). Esta versão
+substitui o SQLite pelo MongoDB, seguindo a modelagem feita pelo grupo.

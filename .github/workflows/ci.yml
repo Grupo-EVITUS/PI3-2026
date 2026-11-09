@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }} + MongoDB 7
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.3", "8.4", "8.5"]
+
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      SAA_REQUIRE_MONGO: "1"
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar PHP ${{ matrix.php }} com ext-mongodb
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mongodb, mbstring, openssl, curl
+          tools: composer:v2
+          coverage: none
+
+      - name: Conferir versões
+        run: |
+          php -v
+          php --ri mongodb | head -n 5
+
+      - name: Validar composer.json
+        run: composer validate --no-check-publish
+
+      - name: Instalar dependências
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Lint de todos os arquivos PHP
+        run: |
+          find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Políticas do front-end (CSP sem inline e sem recursos externos)
+        run: |
+          if grep -rn 'style="' views/; then
+            echo "::error::Há estilo inline nas views (a CSP só permite arquivos CSS)."; exit 1
+          fi
+          if grep -rnP '<script(?![^>]*\ssrc=)|\son[a-z]+\s*=' views/; then
+            echo "::error::Há script ou manipulador de evento inline nas views."; exit 1
+          fi
+          if grep -rnE 'https?://' views/ public/assets/css public/assets/js | grep -v 'www.w3.org'; then
+            echo "::error::Há referência a recurso externo (o SAA não usa CDN)."; exit 1
+          fi
+
+      - name: Testes (unitários, integração com MongoDB e aceitação HTTP)
+        run: vendor/bin/phpunit --do-not-cache-result

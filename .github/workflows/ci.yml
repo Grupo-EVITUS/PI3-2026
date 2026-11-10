@@ -95,14 +95,39 @@ jobs:
       - name: Validar o docker-compose.yml
         run: docker compose config --quiet
 
-      - name: Construir e subir (espera os serviços ficarem saudáveis)
-        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Construir e subir os containers
+        run: |
+          set +e
+          docker compose up -d --build > compose-up.log 2>&1
+          code=$?
+          tail -n 40 compose-up.log
+          if [ "$code" -ne 0 ]; then
+            msg=$(tail -n 25 compose-up.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN { ORS = "%0A" } { print }')
+            echo "::error title=docker compose up::${msg}"
+            exit "$code"
+          fi
 
       - name: Saúde da aplicação e conexão com o MongoDB
         run: |
-          body=$(curl -fsS http://localhost:8080/health)
-          echo "$body"
-          echo "$body" | grep -q '"mongo":true'
+          for attempt in $(seq 1 60); do
+            if body=$(curl -fsS http://localhost:8080/health); then
+              echo "$body"
+              echo "$body" | grep -q '"mongo":true' && exit 0
+            fi
+            sleep 3
+          done
+          echo "::error title=health::A aplicação não respondeu /health com o MongoDB conectado em 3 minutos."
+          exit 1
+
+      - name: Fila de e-mails rodando (worker estável, sem reinícios)
+        run: |
+          sleep 15
+          state=$(docker inspect -f '{{.State.Status}} running={{.State.Running}} restarts={{.RestartCount}} exit={{.State.ExitCode}}' saa-worker-1)
+          echo "$state"
+          case "$state" in
+            "running running=true restarts=0 "*) ;;
+            *) echo "::error title=worker::Estado inesperado da fila de e-mails: ${state}"; exit 1 ;;
+          esac
 
       - name: Tela de login servida pelo container
         run: curl -fsS http://localhost:8080/login | grep -q 'name="csrf_token"'
@@ -115,7 +140,7 @@ jobs:
       - name: Dados persistem após reiniciar os containers (RNF-13)
         run: |
           docker compose restart
-          docker compose up -d --wait --wait-timeout 300
+          for attempt in $(seq 1 60); do curl -fsS http://localhost:8080/health > /dev/null && break; sleep 3; done
           if out=$(docker compose exec -T -e INITIAL_USER_PASSWORD="$INITIAL_USER_PASSWORD" app \
                 php bin/create_user.php --name "Admin CI" --email admin@ci.local --profile ADMIN 2>&1); then
             echo "::error::O usuário pôde ser criado de novo: os dados não persistiram."; exit 1
@@ -139,6 +164,7 @@ jobs:
             echo "::error title=${title}::${msg}"
           }
           annotate "docker compose ps" docker compose ps -a
+          annotate "estado dos containers" docker inspect -f '{{.Name}} status={{.State.Status}} exit={{.State.ExitCode}} restarts={{.RestartCount}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}} error={{.State.Error}}' saa-mongo-1 saa-app-1 saa-worker-1
           for service in mongo app worker; do
             annotate "logs: ${service}" docker compose logs --no-color --tail=40 "${service}"
           done

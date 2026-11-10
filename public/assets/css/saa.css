@@ -1971,3 +1971,120 @@ a.pagination__link:not([aria-current="page"]):hover {
     color: #000;
   }
 }
+
+/* ===== Etapa 2 - cadastros ===== */
+/* Seções recolhíveis (<details>): formulários de cadastro/edição que só aparecem quando a pessoa pede. */
+.registry-disclosure > .registry-disclosure__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h);
+  color: var(--link);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.registry-disclosure > .registry-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.registry-disclosure > .registry-disclosure__summary::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--duration) var(--ease);
+}
+
+.registry-disclosure[open] > .registry-disclosure__summary::after {
+  transform: rotate(-135deg);
+}
+
+.registry-disclosure > .registry-disclosure__summary:hover {
+  color: var(--link-hover);
+}
+
+.registry-disclosure__body {
+  margin-top: var(--space-4);
+}
+
+.registry-disclosure--inline {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.registry-disclosure--inline > .registry-disclosure__summary {
+  font-size: var(--text-sm);
+}
+
+.registry-disclosure--inline > .registry-disclosure__summary::after {
+  margin-left: var(--space-2);
+}
+
+/* Cartão de vínculo aluno ↔ responsável */
+.registry-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.registry-link__head {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.registry-link__name {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.registry-link__badges {
+  --cluster-gap: var(--space-2);
+}
+
+.registry-link__contact {
+  grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr);
+  font-size: var(--text-sm);
+}
+
+/* Lista de escolha (radio) de aluno ou responsável encontrado na busca */
+.registry-choices,
+.registry-fieldset {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.registry-choices .check {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.registry-choices .check:hover {
+  border-color: var(--border-strong);
+}
+
+.registry-fieldset {
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.registry-search {
+  align-items: flex-end;
+}
+
+@media (max-width: 760px) {
+  .registry-search > .btn {
+    width: 100%;
+  }
+}

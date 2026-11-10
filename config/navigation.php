@@ -73,6 +73,14 @@ return [
         'description' => 'Turmas do período letivo e os alunos matriculados em cada uma.',
     ],
     [
+        'label' => 'Períodos letivos',
+        'path' => '/periods',
+        'icon' => 'classes',
+        'permission' => Permissions::REGISTRY_VIEW,
+        'order' => 75,
+        'description' => 'Ano letivo vigente, datas de início e fim e a regra de frequência mínima.',
+    ],
+    [
         'label' => 'Usuários',
         'path' => '/users',
         'icon' => 'users',

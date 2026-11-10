@@ -63,8 +63,9 @@ Request ─► Router ─► (Kernel: sessão, CSRF, autenticação, permissão)
 | Model | `MongoDB\Database`, Collections, Bson, Domain | regra de negócio de outro agregado; HTTP |
 | View | helpers globais (`e()`, `url()`, `can()`, ...) | consultar Model/Service; lógica além de `if/foreach` |
 
-O **Container** (`Saa\Core\Container`) faz *autowiring* pelo tipo dos parâmetros do construtor; `MongoDB\Database` e
-`MailerInterface` são ligados em `App::boot()`. Controllers/Services/Models recebem dependências no construtor.
+O **Container** (`Saa\Core\Container`) faz *autowiring* pelo tipo dos parâmetros do construtor; `MongoDB\Database` é
+ligado em `App::boot()`. O envio de e-mail é escolhido pela `Saa\Services\Mail\MailerFactory` conforme `MAIL_MODE`
+(os testes injetam um `MailerInterface` falso). Controllers/Services/Models recebem dependências no construtor.
 
 ## 4. Ciclo de uma requisição
 
@@ -215,7 +216,10 @@ Campos sensíveis (`password_hash`, `token_hash`) nunca aparecem. IDs: `id` (str
    Sem nenhum responsável válido, a ausência é registrada mesmo assim e a tela avisa.
 2. `MAIL_DISPATCH=inline` envia logo após o registro; `queue` deixa `PENDING` para `bin/process_mail_queue.php`.
    O processamento reserva a mensagem com `findOneAndUpdate` (campo `locked_at`), tenta até 3 vezes (`attempts`) e grava eventos.
-3. `MailerInterface` com `LogMailer` (`MAIL_MODE=log`), `FileMailer` (`file`) e `SmtpMailer` (`smtp`).
+3. `MailerInterface` com `LogMailer` (`MAIL_MODE=log`), `FileMailer` (`file`, grava `.eml` em `MAIL_FILE_DIR`) e
+   `SmtpMailer` (`smtp`), escolhidos pela `MailerFactory`. O token do link é **gerado a cada tentativa de envio**: a
+   notificação pendente guarda o texto com o marcador `{{justification_link}}` e o hash de um token descartável; só o
+   e-mail que sai contém o link real, e o banco guarda apenas o novo hash (o validator recusa corpo com o link).
 4. Estados: `PENDING → SENT → DELIVERED → OPENED` ou `FAILED`. **Enviado ≠ lido**: `DELIVERED/OPENED` só chegam por webhook do provedor;
    o acesso ao link gera o evento `LINK_ACCESSED`.
 5. Reenvio cria **nova** notificação (novo token) referenciando a original (`resend_of`); a antiga é preservada.

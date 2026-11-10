@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 use Saa\Core\Config;
 use Saa\Database\Collections;
+use Saa\Database\DefaultData;
 use Saa\Database\Mongo;
 use Saa\Database\Schema;
 
@@ -94,6 +95,7 @@ try {
     }
 
     $report = Schema::apply($database);
+    $defaults = DefaultData::apply($database); // dados padrão (modelo de e-mail ABSENCE_NOTICE); idempotente
 } catch (Throwable $e) {
     fwrite(STDERR, 'Falha: ' . $e->getMessage() . "\n");
     exit(1);
@@ -136,5 +138,6 @@ if ($extras !== []) {
         echo "  - {$line}\n";
     }
 }
+echo $defaults === [] ? "Dados padrão: já existentes (nada alterado).\n" : 'Dados padrão criados: ' . implode(', ', $defaults) . ".\n";
 echo $drop ? "Banco recriado do zero.\n" : "Nenhum dado foi apagado.\n";
 exit(0);

@@ -1,0 +1,18 @@
+# O contexto de build leva só o necessário para rodar a aplicação.
+.git
+.github
+.vscode
+.idea
+vendor
+var
+.phpunit.cache
+.env
+.env.*
+!.env.example
+tests
+Sprint
+Diagramas
+*.zip
+*.pdf
+*.docx
+docs

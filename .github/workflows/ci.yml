@@ -78,3 +78,55 @@ jobs:
 
       - name: Testes (unitários, integração com MongoDB e aceitação HTTP)
         run: vendor/bin/phpunit --do-not-cache-result
+
+  docker:
+    name: Docker Compose (MongoDB + aplicação + fila)
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      INITIAL_USER_PASSWORD: "SenhaDoCI-2026!"
+      EMAIL_WEBHOOK_SECRET: "segredo-somente-do-ci"
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Validar o docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Construir e subir (espera os serviços ficarem saudáveis)
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Saúde da aplicação e conexão com o MongoDB
+        run: |
+          body=$(curl -fsS http://localhost:8080/health)
+          echo "$body"
+          echo "$body" | grep -q '"mongo":true'
+
+      - name: Tela de login servida pelo container
+        run: curl -fsS http://localhost:8080/login | grep -q 'name="csrf_token"'
+
+      - name: Criar usuário dentro do container
+        run: |
+          docker compose exec -T -e INITIAL_USER_PASSWORD="$INITIAL_USER_PASSWORD" app \
+            php bin/create_user.php --name "Admin CI" --email admin@ci.local --profile ADMIN
+
+      - name: Dados persistem após reiniciar os containers (RNF-13)
+        run: |
+          docker compose restart
+          docker compose up -d --wait --wait-timeout 300
+          if out=$(docker compose exec -T -e INITIAL_USER_PASSWORD="$INITIAL_USER_PASSWORD" app \
+                php bin/create_user.php --name "Admin CI" --email admin@ci.local --profile ADMIN 2>&1); then
+            echo "::error::O usuário pôde ser criado de novo: os dados não persistiram."; exit 1
+          fi
+          echo "$out"
+          echo "$out" | grep -q "Já existe"
+
+      - name: Logs dos containers
+        if: always()
+        run: docker compose logs --no-color --tail=150
+
+      - name: Derrubar e apagar volumes
+        if: always()
+        run: docker compose down -v

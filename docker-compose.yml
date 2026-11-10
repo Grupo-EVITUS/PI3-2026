@@ -1,0 +1,71 @@
+# SAA com Docker Compose: MongoDB + aplicação + fila de e-mails.
+#   docker compose up -d --build      → http://localhost:8080
+#   SEED_DEMO=true docker compose up -d --build   (carrega dados fictícios, quando disponíveis)
+#   docker compose down               (para; os dados continuam no volume "mongo-data")
+#   docker compose down -v            (para e APAGA o banco)
+# Variáveis podem vir de um arquivo .env ao lado deste arquivo (veja .env.example).
+name: saa
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-development}
+  APP_URL: ${APP_URL:-http://localhost:8080}
+  APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
+  MONGODB_URI: mongodb://mongo:27017
+  MONGODB_DB: ${MONGODB_DB:-saa}
+  MAIL_MODE: ${MAIL_MODE:-file}
+  MAIL_DISPATCH: ${MAIL_DISPATCH:-queue}
+  MAIL_FROM: ${MAIL_FROM:-nao-responda@escola.local}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-SAA - Sistema de Ausência de Alunos}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_ENCRYPTION: ${SMTP_ENCRYPTION:-starttls}
+  EMAIL_WEBHOOK_SECRET: ${EMAIL_WEBHOOK_SECRET:-}
+  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+  SEED_PASSWORD: ${SEED_PASSWORD:-}
+
+services:
+  mongo:
+    image: mongo:7.0
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: saa-app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SEED_DEMO: ${SEED_DEMO:-false}
+    ports:
+      - "${APP_PORT:-8080}:8000"
+    volumes:
+      - app-var:/app/var
+
+  worker:
+    build: .
+    image: saa-app
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SKIP_DB_INIT: "true"
+    command: ["php", "bin/process_mail_queue.php", "--watch"]
+    volumes:
+      - app-var:/app/var
+
+volumes:
+  mongo-data:
+  app-var:

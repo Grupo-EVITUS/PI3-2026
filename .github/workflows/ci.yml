@@ -127,6 +127,22 @@ jobs:
         if: always()
         run: docker compose logs --no-color --tail=150
 
+      # Os logs do job só são visíveis para administradores do repositório; em caso de falha, o diagnóstico
+      # também vira anotação (visível para quem acompanha o PR/commit e pela API pública de check-runs).
+      - name: Diagnóstico em anotações (somente se falhar)
+        if: failure()
+        run: |
+          annotate() {
+            local title="$1"; shift
+            local msg
+            msg=$("$@" 2>&1 | tail -n 40 | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN { ORS = "%0A" } { print }')
+            echo "::error title=${title}::${msg}"
+          }
+          annotate "docker compose ps" docker compose ps -a
+          for service in mongo app worker; do
+            annotate "logs: ${service}" docker compose logs --no-color --tail=40 "${service}"
+          done
+
       - name: Derrubar e apagar volumes
         if: always()
         run: docker compose down -v

@@ -63,6 +63,9 @@ services:
       <<: *app-env
       SKIP_DB_INIT: "true"
     command: ["php", "bin/process_mail_queue.php", "--watch"]
+    # A imagem traz um HEALTHCHECK do servidor web (/health); a fila não serve HTTP, então ele não se aplica aqui.
+    healthcheck:
+      disable: true
     volumes:
       - app-var:/app/var
 

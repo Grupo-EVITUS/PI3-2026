@@ -21,6 +21,9 @@ use Saa\Support\Email;
  */
 final class GuardianService
 {
+    /** Mensagem de e-mail repetido (a API JSON a responde com 409). */
+    public const DUPLICATE_EMAIL = 'Já existe um responsável com este e-mail.';
+
     private const PICKER_LIMIT = 15;
 
     public function __construct(
@@ -33,16 +36,17 @@ final class GuardianService
     /**
      * @return array{items: list<array<string, mixed>>, pagination: array<string, int>, filters: array{q: string, status: string}}
      */
-    public function list(?string $term, ?string $status, int $page): array
+    public function list(?string $term, ?string $status, int $page, int $perPage = RegistrySupport::PER_PAGE): array
     {
         $term = trim((string)$term);
         $active = RegistrySupport::activeFilter($status);
         $regex = $term !== '' ? Bson::contains($term) : null;
         $page = RegistrySupport::page($page);
-        $result = $this->guardians->search($regex, $active, ($page - 1) * RegistrySupport::PER_PAGE, RegistrySupport::PER_PAGE);
-        $pagination = RegistrySupport::pagination($page, $result['total']);
+        $perPage = max(1, $perPage);
+        $result = $this->guardians->search($regex, $active, ($page - 1) * $perPage, $perPage);
+        $pagination = RegistrySupport::pagination($page, $result['total'], $perPage);
         if ($pagination['page'] !== $page && $result['total'] > 0) {
-            $result = $this->guardians->search($regex, $active, $pagination['skip'], RegistrySupport::PER_PAGE);
+            $result = $this->guardians->search($regex, $active, $pagination['skip'], $perPage);
         }
         return [
             'items' => array_map(self::present(...), $result['items']),
@@ -137,7 +141,7 @@ final class GuardianService
                 'updated_at' => $now,
             ]);
         } catch (ConflictException) {
-            throw new ValidationException([$prefix . 'email' => 'Já existe um responsável com este e-mail.']);
+            throw new ValidationException([$prefix . 'email' => self::DUPLICATE_EMAIL]);
         }
         $this->audit->record('guardian.create', 'guardians', $guardian['_id'], ['email' => $guardian['email_normalized']]);
         return $guardian;
@@ -165,7 +169,7 @@ final class GuardianService
         try {
             $this->guardians->update($guardian['_id'], $fields);
         } catch (ConflictException) {
-            throw new ValidationException(['email' => 'Já existe um responsável com este e-mail.']);
+            throw new ValidationException(['email' => self::DUPLICATE_EMAIL]);
         }
         $this->audit->record('guardian.update', 'guardians', $guardian['_id'], [
             'email_changed' => $fields['email_normalized'] !== ($guardian['email_normalized'] ?? null),

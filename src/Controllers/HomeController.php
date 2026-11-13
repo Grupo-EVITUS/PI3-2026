@@ -7,13 +7,19 @@ use Saa\Core\Clock;
 use Saa\Core\Request;
 use Saa\Core\Response;
 use Saa\Domain\Profile;
+use Saa\Services\HomeService;
 use Saa\Services\SystemStatusService;
 
-/** Tela inicial (GET /home) e o atalho GET / (redireciona para /home). */
+/**
+ * Tela inicial (GET /home) e o atalho GET / (redireciona para /home).
+ * Além da saudação e dos atalhos (Etapa 1), mostra números reais do MongoDB conforme o perfil (issue #28).
+ */
 final class HomeController extends Controller
 {
-    public function __construct(private readonly SystemStatusService $system)
-    {
+    public function __construct(
+        private readonly SystemStatusService $system,
+        private readonly HomeService $home,
+    ) {
     }
 
     public function root(Request $request): Response
@@ -44,6 +50,7 @@ final class HomeController extends Controller
             'user' => $user,
             'greeting' => self::greeting((int)Clock::now()->format('G')),
             'shortcuts' => $shortcuts,
+            'summary' => $this->home->summary($user),
             // o card "Ambiente" (conexão com o MongoDB) é exclusivo do administrador
             'environment' => $user['profile'] === Profile::ADMIN->value ? $this->system->environment() : null,
         ]);

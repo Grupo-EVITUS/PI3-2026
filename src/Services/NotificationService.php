@@ -169,6 +169,69 @@ final class NotificationService
         return $this->notifications->findById($document['_id']) ?? $document;
     }
 
+    // ------------------------------------------------------------------ consulta (API JSON)
+
+    /**
+     * Histórico de comunicações das ausências informadas (mais recentes primeiro), pronto para JSON.
+     *
+     * @param list<ObjectId> $attendanceIds
+     * @return list<array<string, mixed>>
+     */
+    public function historyOf(array $attendanceIds): array
+    {
+        return array_map(self::present(...), $this->notifications->findByAttendances($attendanceIds));
+    }
+
+    /**
+     * Notificação → dados públicos (lista branca): status, tentativas, eventos e validade do link. Nunca inclui
+     * token_hash, o corpo do e-mail nem a reserva da fila.
+     *
+     * @param array<string, mixed> $notification
+     * @return array<string, mixed>
+     */
+    public static function present(array $notification): array
+    {
+        $link = is_array($notification['justification_link'] ?? null) ? $notification['justification_link'] : [];
+        $events = [];
+        foreach ((array)($notification['events'] ?? []) as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            $events[] = [
+                'type' => (string)($event['type'] ?? ''),
+                'occurred_at' => self::instant($event['occurred_at'] ?? null),
+                'detail' => is_string($event['detail'] ?? null) ? $event['detail'] : null,
+            ];
+        }
+        $id = static fn (mixed $value): ?string => $value instanceof ObjectId ? (string)$value : null;
+        return [
+            'id' => (string)$notification['_id'],
+            'attendance_id' => $id($notification['attendance_id'] ?? null),
+            'student_id' => $id($notification['student_id'] ?? null),
+            'guardian_id' => $id($notification['guardian_id'] ?? null),
+            'recipient_email' => (string)($notification['recipient_email'] ?? ''),
+            'subject' => (string)($notification['subject'] ?? ''),
+            'status' => (string)($notification['status'] ?? ''),
+            'attempts' => (int)($notification['attempts'] ?? 0),
+            'provider_message_id' => is_string($notification['provider_message_id'] ?? null) ? $notification['provider_message_id'] : null,
+            'last_error' => is_string($notification['last_error'] ?? null) ? $notification['last_error'] : null,
+            'next_attempt_at' => self::instant($notification['next_attempt_at'] ?? null),
+            'resend_of' => $id($notification['resend_of'] ?? null),
+            'link_expires_at' => self::instant($link['expires_at'] ?? null),
+            'link_used_at' => self::instant($link['used_at'] ?? null),
+            'events' => $events,
+            'created_by' => $id($notification['created_by'] ?? null),
+            'created_at' => self::instant($notification['created_at'] ?? null),
+            'updated_at' => self::instant($notification['updated_at'] ?? null),
+        ];
+    }
+
+    /** UTCDateTime → ISO-8601 em UTC ("2026-10-09T15:00:00Z"); outros valores → null. */
+    private static function instant(mixed $value): ?string
+    {
+        return $value instanceof UTCDateTime ? (string)Bson::toPlain($value) : null;
+    }
+
     // ------------------------------------------------------------------ envio
 
     /** MAIL_DISPATCH: inline (padrão) envia logo após criar; queue só enfileira. */

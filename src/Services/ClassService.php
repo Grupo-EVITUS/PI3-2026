@@ -23,6 +23,8 @@ use Saa\Models\StudentModel;
 final class ClassService
 {
     public const ARCHIVE_BLOCKED = 'Transfira os alunos antes de arquivar a turma.';
+    /** Código repetido no mesmo período (a API JSON responde com 409). */
+    public const DUPLICATE_CODE = 'Já existe uma turma com este código neste período letivo.';
 
     private const LABELS = [
         'academic_period_id' => 'o período letivo',
@@ -142,7 +144,7 @@ final class ClassService
                 'updated_at' => $now,
             ]);
         } catch (ConflictException) {
-            throw new ValidationException(['code' => 'Já existe uma turma com este código neste período letivo.']);
+            throw new ValidationException(['code' => self::DUPLICATE_CODE]);
         }
         $this->audit->record('class.create', 'classes', $class['_id'], ['code' => $class['code'], 'academic_period_id' => (string)$class['academic_period_id']]);
         return self::presentRow($class);
@@ -164,7 +166,7 @@ final class ClassService
         try {
             $this->classes->update($class['_id'], $fields);
         } catch (ConflictException) {
-            throw new ValidationException(['code' => 'Já existe uma turma com este código neste período letivo.']);
+            throw new ValidationException(['code' => self::DUPLICATE_CODE]);
         }
         $this->audit->record('class.update', 'classes', $class['_id'], ['code' => $fields['code']]);
         return self::presentRow($this->find($id));

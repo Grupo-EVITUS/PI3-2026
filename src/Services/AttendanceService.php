@@ -5,8 +5,10 @@ namespace Saa\Services;
 
 use InvalidArgumentException;
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
 use Saa\Core\Clock;
 use Saa\Core\Exceptions\ConflictException;
+use Saa\Core\Exceptions\NotFoundException;
 use Saa\Core\Exceptions\ValidationException;
 use Saa\Core\Validator;
 use Saa\Database\Bson;
@@ -143,6 +145,199 @@ final class AttendanceService
             'notifications' => $result['notifications'],
             'warnings' => $result['warnings'],
         ];
+    }
+
+    // ------------------------------------------------------------------ consultas (API JSON)
+
+    /**
+     * Frequência com filtros (todos opcionais), mais recentes primeiro, paginada.
+     *
+     * @param array<string, mixed> $input student_id, class_id, date_from, date_to (AAAA-MM-DD), status, justification_status
+     * @return array{items: list<array<string, mixed>>, pagination: array<string, int>}
+     * @throws ValidationException filtro inválido
+     */
+    public function search(array $input, int $page, int $perPage = RegistrySupport::PER_PAGE): array
+    {
+        $validator = Validator::make($input, ['date_from' => 'a data inicial', 'date_to' => 'a data final'])
+            ->objectId('student_id')
+            ->objectId('class_id')
+            ->date('date_from')
+            ->date('date_to')
+            ->in('status', AttendanceStatus::values())
+            ->in('justification_status', JustificationStatus::values());
+        $valid = $validator->validated();
+        if (isset($valid['date_from'], $valid['date_to']) && $valid['date_from'] > $valid['date_to']) {
+            $validator->addError('date_to', 'A data final precisa ser igual ou posterior à data inicial.');
+        }
+        $valid = $validator->validate();
+
+        $filters = [];
+        foreach (['student_id', 'class_id'] as $field) {
+            $oid = Bson::objectId($valid[$field] ?? null);
+            if ($oid !== null) {
+                $filters[$field] = $oid;
+            }
+        }
+        foreach (['date_from', 'date_to'] as $field) {
+            if (is_string($valid[$field] ?? null) && $valid[$field] !== '') {
+                $filters[$field] = Bson::day($valid[$field]);
+            }
+        }
+        foreach (['status', 'justification_status'] as $field) {
+            if (is_string($valid[$field] ?? null) && $valid[$field] !== '') {
+                $filters[$field] = $valid[$field];
+            }
+        }
+
+        $page = RegistrySupport::page($page);
+        $perPage = max(1, $perPage);
+        $result = $this->attendance->search($filters, ($page - 1) * $perPage, $perPage);
+        $pagination = RegistrySupport::pagination($page, $result['total'], $perPage);
+        if ($pagination['page'] !== $page && $result['total'] > 0) {
+            $result = $this->attendance->search($filters, $pagination['skip'], $perPage);
+        }
+        return ['items' => array_map(self::present(...), $result['items']), 'pagination' => $pagination];
+    }
+
+    /**
+     * Um registro de frequência com a justificativa e o status_history.
+     *
+     * @return array<string, mixed>
+     * @throws NotFoundException
+     */
+    public function get(string $id): array
+    {
+        $oid = RegistrySupport::idOrFail($id, 'Registro de frequência não encontrado.');
+        $record = $this->attendance->findWithStudent($oid) ?? throw new NotFoundException('Registro de frequência não encontrado.');
+        return self::present($record);
+    }
+
+    /**
+     * Contexto de notificação do aluno (CONSULTA 1): dados do aluno ATIVO, responsáveis que recebem aviso (ativos e
+     * com e-mail VALID) e as 30 faltas mais recentes.
+     *
+     * @return array{student: array<string, string>, guardians_to_notify: list<array<string, string>>, recent_absences: list<array<string, mixed>>}
+     * @throws NotFoundException aluno inexistente ou arquivado
+     */
+    public function studentContext(string $studentId): array
+    {
+        $oid = RegistrySupport::idOrFail($studentId, 'Aluno não encontrado ou arquivado.');
+        $row = $this->context->find($oid) ?? throw new NotFoundException('Aluno não encontrado ou arquivado.');
+        $guardians = [];
+        foreach ((array)($row['guardians_to_notify'] ?? []) as $guardian) {
+            if (is_array($guardian)) {
+                $guardians[] = ['id' => (string)$guardian['_id'], 'name' => (string)($guardian['name'] ?? ''), 'email' => (string)($guardian['email'] ?? '')];
+            }
+        }
+        $absences = [];
+        foreach ((array)($row['absences'] ?? []) as $absence) {
+            if (!is_array($absence)) {
+                continue;
+            }
+            $justification = is_array($absence['justification'] ?? null) ? $absence['justification'] : [];
+            $absences[] = [
+                'id' => (string)$absence['_id'],
+                'date' => Bson::ymd($absence['date'] ?? null),
+                'status' => (string)($absence['status'] ?? ''),
+                'class_name' => (string)($absence['class_name'] ?? ''),
+                'justification_status' => is_string($justification['status'] ?? null) ? $justification['status'] : null,
+                'reason_code' => is_string($justification['reason_code'] ?? null) ? $justification['reason_code'] : null,
+                'submitted_at' => self::instant($justification['submitted_at'] ?? null),
+            ];
+        }
+        return [
+            'student' => ['id' => (string)$row['_id'], 'name' => (string)($row['name'] ?? ''), 'student_code' => (string)($row['student_code'] ?? '')],
+            'guardians_to_notify' => $guardians,
+            'recent_absences' => $absences,
+        ];
+    }
+
+    /**
+     * Histórico de comunicações de uma ausência (attendance_id) ou de todas as ausências de um aluno (student_id).
+     *
+     * @return list<array<string, mixed>>
+     * @throws ValidationException sem filtro ou com id malformado
+     * @throws NotFoundException ausência inexistente
+     */
+    public function notificationHistory(?string $attendanceId, ?string $studentId): array
+    {
+        $attendanceId = $attendanceId === null || trim($attendanceId) === '' ? null : trim($attendanceId);
+        $studentId = $studentId === null || trim($studentId) === '' ? null : trim($studentId);
+        if ($attendanceId === null && $studentId === null) {
+            throw new ValidationException(['attendance_id' => 'Informe a ausência (attendance_id) ou o aluno (student_id).']);
+        }
+        if ($attendanceId !== null) {
+            $oid = Bson::objectId($attendanceId) ?? throw new ValidationException(['attendance_id' => 'Identificador inválido.']);
+            $record = $this->attendance->findById($oid) ?? throw new NotFoundException('Registro de frequência não encontrado.');
+            if ($studentId !== null && (string)$record['student_id'] !== strtolower($studentId)) {
+                return [];
+            }
+            return $this->notifications->historyOf([$oid]);
+        }
+        $student = Bson::objectId($studentId) ?? throw new ValidationException(['student_id' => 'Identificador inválido.']);
+        return $this->notifications->historyOf($this->attendance->idsOfStudent($student));
+    }
+
+    /**
+     * Registro de attendance_records → dados públicos (ids em texto, data AAAA-MM-DD, instantes ISO-8601 UTC).
+     *
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public static function present(array $record): array
+    {
+        $id = static fn (mixed $value): ?string => $value instanceof ObjectId ? (string)$value : null;
+        $student = is_array($record['student'] ?? null) ? $record['student'] : null;
+        $details = is_array($record['details'] ?? null) ? $record['details'] : [];
+        $justification = is_array($record['justification'] ?? null) ? $record['justification'] : null;
+        $history = [];
+        foreach ((array)($justification['status_history'] ?? []) as $item) {
+            if (is_array($item)) {
+                $history[] = [
+                    'status' => (string)($item['status'] ?? ''),
+                    'at' => self::instant($item['at'] ?? null),
+                    'by_user_id' => $id($item['by_user_id'] ?? null),
+                    'by_guardian_id' => $id($item['by_guardian_id'] ?? null),
+                ];
+            }
+        }
+        return [
+            'id' => (string)$record['_id'],
+            'student_id' => $id($record['student_id'] ?? null),
+            'student' => $student === null ? null : [
+                'id' => (string)$student['_id'],
+                'name' => (string)($student['name'] ?? ''),
+                'student_code' => (string)($student['student_code'] ?? ''),
+            ],
+            'date' => Bson::ymd($record['date'] ?? null),
+            'status' => (string)($record['status'] ?? ''),
+            'class_id' => $id($record['class_id'] ?? null),
+            'class_name' => (string)($record['class_name'] ?? ''),
+            'academic_period_id' => $id($record['academic_period_id'] ?? null),
+            'enrollment_id' => $id($record['enrollment_id'] ?? null),
+            'registered_by' => $id($record['registered_by'] ?? null),
+            'details' => [
+                'source' => is_string($details['source'] ?? null) ? $details['source'] : null,
+                'note' => is_string($details['note'] ?? null) ? $details['note'] : null,
+            ],
+            'justification' => $justification === null ? null : [
+                'status' => (string)($justification['status'] ?? ''),
+                'guardian_id' => $id($justification['guardian_id'] ?? null),
+                'reason_code' => is_string($justification['reason_code'] ?? null) ? $justification['reason_code'] : null,
+                'explanation' => is_string($justification['explanation'] ?? null) ? $justification['explanation'] : null,
+                'submitted_at' => self::instant($justification['submitted_at'] ?? null),
+                'notification_id' => $id($justification['notification_id'] ?? null),
+                'status_history' => $history,
+            ],
+            'created_at' => self::instant($record['created_at'] ?? null),
+            'updated_at' => self::instant($record['updated_at'] ?? null),
+        ];
+    }
+
+    /** UTCDateTime → ISO-8601 em UTC; outros valores → null. */
+    private static function instant(mixed $value): ?string
+    {
+        return $value instanceof UTCDateTime ? (string)Bson::toPlain($value) : null;
     }
 
     /** @param array<string, mixed> $enrollment */

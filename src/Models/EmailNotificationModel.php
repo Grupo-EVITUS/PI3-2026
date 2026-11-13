@@ -65,6 +65,24 @@ final class EmailNotificationModel extends Model
         )->toArray());
     }
 
+    /**
+     * Comunicações de várias ausências (histórico de um aluno), mais recentes primeiro, sem token_hash.
+     * Usa o índice ix_notifications_attendance.
+     *
+     * @param list<ObjectId> $attendanceIds
+     * @return list<array<string, mixed>>
+     */
+    public function findByAttendances(array $attendanceIds): array
+    {
+        if ($attendanceIds === []) {
+            return [];
+        }
+        return array_values($this->collection()->find(
+            ['attendance_id' => ['$in' => array_values($attendanceIds)]],
+            ['projection' => self::PROJECTION, 'sort' => ['created_at' => -1, '_id' => -1]]
+        )->toArray());
+    }
+
     // ------------------------------------------------------------------ fila
 
     /**

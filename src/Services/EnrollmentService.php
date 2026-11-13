@@ -22,6 +22,9 @@ use Saa\Models\StudentModel;
  */
 final class EnrollmentService
 {
+    /** Matrícula repetida na mesma turma (a API JSON responde com 409). */
+    public const ALREADY_ENROLLED = 'O aluno já está matriculado nesta turma.';
+
     public function __construct(
         private readonly EnrollmentModel $enrollments,
         private readonly StudentModel $students,
@@ -88,7 +91,7 @@ final class EnrollmentService
         $period = (array)$this->periods->findById($class['academic_period_id']);
         $current = $this->enrollments->findActiveByStudent($studentId);
         if ($current !== null && (string)$current['class_id'] === (string)$class['_id']) {
-            throw new ValidationException([$field => 'O aluno já está matriculado nesta turma.']);
+            throw new ValidationException([$field => self::ALREADY_ENROLLED]);
         }
 
         $today = RegistrySupport::today();

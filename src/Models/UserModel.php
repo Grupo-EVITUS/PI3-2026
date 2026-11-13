@@ -4,10 +4,12 @@ declare(strict_types=1);
 namespace Saa\Models;
 
 use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\Regex;
 use MongoDB\Driver\Exception\BulkWriteException;
 use Saa\Core\Exceptions\ConflictException;
 use Saa\Database\Bson;
 use Saa\Database\Collections;
+use Saa\Domain\Profile;
 use Saa\Support\Email;
 
 /**
@@ -116,5 +118,86 @@ final class UserModel extends Model
         if ($oid !== null) {
             $this->collection()->updateOne(['_id' => $oid], ['$set' => ['password_hash' => $passwordHash]]);
         }
+    }
+
+    // ------------------------------------------------------------------ gestão de usuários (issues #36 e #37)
+
+    /**
+     * Busca paginada (sem password_hash) por nome ou e-mail, com filtro de perfil e de situação, numa só agregação.
+     *
+     * @param Regex|null  $term    filtro "contém" já escapado (Bson::contains), aplicado ao nome e ao e-mail normalizado
+     * @param string|null $profile código do perfil já validado (null = todos)
+     * @param bool|null   $active  true = ativos, false = inativos, null = todos
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    public function search(?Regex $term, ?string $profile, ?bool $active, int $skip, int $limit): array
+    {
+        $match = [];
+        if ($term !== null) {
+            $match['$or'] = [['name' => $term], ['email_normalized' => $term]];
+        }
+        if ($profile !== null) {
+            $match['profile'] = $profile;
+        }
+        if ($active !== null) {
+            $match['active'] = $active;
+        }
+        $pipeline = [
+            ['$match' => $match === [] ? new \stdClass() : $match],
+            ['$project' => ['password_hash' => 0]],
+            ['$facet' => [
+                'items' => [
+                    ['$sort' => ['name' => 1, '_id' => 1]],
+                    ['$skip' => max(0, $skip)],
+                    ['$limit' => max(1, $limit)],
+                ],
+                'total' => [['$count' => 'n']],
+            ]],
+        ];
+        $result = $this->collection()->aggregate($pipeline)->toArray();
+        $facet = $result[0] ?? ['items' => [], 'total' => []];
+        return [
+            'items' => array_values($facet['items'] ?? []),
+            'total' => (int)($facet['total'][0]['n'] ?? 0),
+        ];
+    }
+
+    /**
+     * Atualiza nome, perfil e situação (lista branca: outros campos são ignorados).
+     *
+     * @param array{name?: string, profile?: string, active?: bool} $fields valores já validados pelo serviço
+     * @return bool true se o usuário existe
+     */
+    public function updateAccount(ObjectId $id, array $fields): bool
+    {
+        $set = array_intersect_key($fields, ['name' => true, 'profile' => true, 'active' => true]);
+        $set['updated_at'] = Bson::now();
+        $result = $this->collection()->updateOne(['_id' => $id], ['$set' => $set]);
+        return $result->getMatchedCount() === 1;
+    }
+
+    /**
+     * Grava uma nova senha definida pelo administrador (hash já calculado) e atualiza password_changed_at.
+     *
+     * @return bool true se o usuário existe
+     */
+    public function setPassword(ObjectId $id, string $passwordHash): bool
+    {
+        $now = Bson::now();
+        $result = $this->collection()->updateOne(
+            ['_id' => $id],
+            ['$set' => ['password_hash' => $passwordHash, 'password_changed_at' => $now, 'updated_at' => $now]]
+        );
+        return $result->getMatchedCount() === 1;
+    }
+
+    /** Quantos administradores ativos existem (opcionalmente desconsiderando um usuário). Usa ix_users_profile_active. */
+    public function countActiveAdmins(?ObjectId $except = null): int
+    {
+        $filter = ['profile' => Profile::ADMIN->value, 'active' => true];
+        if ($except !== null) {
+            $filter['_id'] = ['$ne' => $except];
+        }
+        return $this->collection()->countDocuments($filter);
     }
 }

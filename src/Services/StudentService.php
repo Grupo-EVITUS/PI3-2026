@@ -24,7 +24,8 @@ final class StudentService
         'birth_date' => 'a data de nascimento',
         'class_id' => 'a turma',
     ];
-    private const DUPLICATE_CODE = 'Já existe um aluno com esta matrícula escolar.';
+    /** Mensagem de matrícula escolar repetida (a API JSON a responde com 409). */
+    public const DUPLICATE_CODE = 'Já existe um aluno com esta matrícula escolar.';
 
     public function __construct(
         private readonly StudentModel $students,
@@ -36,21 +37,22 @@ final class StudentService
     }
 
     /**
-     * Listagem paginada (20 por página) com busca por nome/matrícula, filtro por turma e situação.
+     * Listagem paginada (20 por página; a API JSON escolhe até 100) com busca por nome/matrícula, filtro por turma e situação.
      *
      * @return array{items: list<array<string, mixed>>, pagination: array<string, int>, filters: array{q: string, class: string, status: string}}
      */
-    public function list(?string $term, ?string $classId, ?string $status, int $page): array
+    public function list(?string $term, ?string $classId, ?string $status, int $page, int $perPage = RegistrySupport::PER_PAGE): array
     {
         $term = trim((string)$term);
         $regex = $term !== '' ? Bson::contains($term) : null;
         $class = Bson::objectId($classId);
         $active = RegistrySupport::activeFilter($status);
         $page = RegistrySupport::page($page);
-        $result = $this->students->search($regex, $class, $active, ($page - 1) * RegistrySupport::PER_PAGE, RegistrySupport::PER_PAGE);
-        $pagination = RegistrySupport::pagination($page, $result['total']);
+        $perPage = max(1, $perPage);
+        $result = $this->students->search($regex, $class, $active, ($page - 1) * $perPage, $perPage);
+        $pagination = RegistrySupport::pagination($page, $result['total'], $perPage);
         if ($pagination['page'] !== $page && $result['total'] > 0) {
-            $result = $this->students->search($regex, $class, $active, $pagination['skip'], RegistrySupport::PER_PAGE);
+            $result = $this->students->search($regex, $class, $active, $pagination['skip'], $perPage);
         }
         return [
             'items' => array_map(self::present(...), $result['items']),

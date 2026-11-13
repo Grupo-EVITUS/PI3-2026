@@ -71,11 +71,29 @@ fatia coerente que porte também os consumidores da identidade, autorização, s
 O fluxo de justificativas e envio de e-mail permanece inalterado. O teste de autorização por
 rota e rotação de sessão pertence à integração HTTP futura, não a este adaptador isolado.
 
+## Etapa 3.2a — gravador de auditoria isolado
+`MongoOperationLogWriter` acrescenta registros em `operation_logs` sem oferecer edição ou
+exclusão. O ator usa ObjectId opcional, o ID da entidade é serializado como texto, e o instante
+é armazenado como data BSON UTC. Campos têm limites de tamanho; o documento não possui campos
+dedicados para hash, token ou corpo de mensagem. Chamadores devem manter esses valores fora de
+`details` e gravar somente contexto operacional redigido.
+
+O gravador não substitui `Helpers::audit(PDO)` nem está conectado às rotas. A escrita de um
+usuário e seu evento ainda não é atômica nesta fatia. O CRUD de usuários junto com auditoria
+deve aguardar suporte a transações e testes numa topologia replica set; a CI atual usa MongoDB
+standalone. A migração de sessão/rotas também espera que todos os serviços consumidores usem
+ObjectId e MongoDB, sem mistura com PDO/IDs inteiros.
+O contrato append-only limita a API do componente, não as permissões do usuário MongoDB. Antes
+da integração de runtime, restringir as permissões sobre `operation_logs` para impedir update e
+delete; validar também que cada chamador não inclua e-mail, token, hash ou conteúdo de mensagem
+em `details`.
+
 ## Evidências e limites
 O workflow inclui lint e teste com MongoDB 7 standalone: documentos válidos por coleção,
 rejeição de inválidos, updates inválidos, índices únicos, normalização de e-mail,
 matrículas nulas, responsáveis com e-mail compartilhado, bootstrap repetido sem perda de dados
 e recusa de dados incompatíveis preexistentes.
-A execução e seu resultado devem ser conferidos no SHA candidato. Esta subetapa prepara o seed
-administrativo e o health check CLI. A etapa 2 só será encerrada após o CI executar os novos testes;
-ainda restam os gates de runtime, paridade e migração.
+A fundação da etapa 2 (incluindo seed e health check CLI) passou no CI MongoDB 7, run #5. A etapa
+3.1 de autenticação isolada passou no run #7. Esta etapa 3.2a acrescenta o teste append-only;
+seu resultado precisa ser conferido no SHA candidato. Ainda restam os gates de runtime, paridade
+e migração.

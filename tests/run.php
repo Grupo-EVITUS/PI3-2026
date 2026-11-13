@@ -119,6 +119,22 @@ Services::saveClass($pdo, [
     'academic_year' => '2026',
     'shift' => 'Tarde',
 ]);
+Services::saveStudent($pdo, [
+    'id' => (string)$studentOne,
+    'name' => 'Aluno Um',
+    'registration_no' => 'T-001',
+    'class_id' => (string)$newClassId,
+]);
+check(
+    Services::publicJustification($pdo, $token)['class_name'] === 'Turma Teste',
+    'transferência do aluno não altera a turma registrada na ocorrência histórica'
+);
+$tryToRewriteSnapshot = $pdo->prepare('UPDATE absences SET class_id = ? WHERE id = ?');
+expectException(
+    static fn() => $tryToRewriteSnapshot->execute([$newClassId, (int)$result['absences'][0]['id']]),
+    PDOException::class,
+    'snapshot da turma da ausência é imutável'
+);
 $newStudentId = Services::saveStudent($pdo, [
     'name' => 'Aluno Novo',
     'registration_no' => 'T-004',
@@ -168,6 +184,38 @@ check($failureAbsenceId > 0, 'reenviar preserva e referencia a ocorrência origi
 putenv('MAIL_MODE=log');
 check(processMailQueue($pdo, 1) === 1, 'processa o reenvio');
 
+Database::migrate($pdo);
+$appliedMigrations = (int)$pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn();
+check($appliedMigrations === 2, 'migrações são rastreadas e podem ser reaplicadas sem duplicação');
+
+$legacyDatabasePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'saa-legacy-test-' . bin2hex(random_bytes(6)) . '.sqlite3';
+$legacyPdo = new PDO('sqlite:' . $legacyDatabasePath);
+$legacyPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$legacyPdo->exec('PRAGMA foreign_keys = ON');
+$legacyPdo->exec((string)file_get_contents(__DIR__ . '/../migrations/001_initial.sql'));
+$legacyPdo->prepare(
+    'INSERT INTO users (name, email, password_hash, profile, created_at) VALUES (?, ?, ?, ?, ?)'
+)->execute(['AOE Legado', 'aoe-legado@test.local', password_hash('SenhaSegura123!', PASSWORD_DEFAULT), 'AOE', $now]);
+$legacyUserId = (int)$legacyPdo->lastInsertId();
+$legacyPdo->prepare(
+    'INSERT INTO classes (name, grade, academic_year, shift, created_at) VALUES (?, ?, ?, ?, ?)'
+)->execute(['Turma Legada', '6º ano', 2025, 'Tarde', $now]);
+$legacyClassId = (int)$legacyPdo->lastInsertId();
+$legacyPdo->prepare(
+    'INSERT INTO students (name, registration_no, class_id, created_at) VALUES (?, ?, ?, ?)'
+)->execute(['Aluno Legado', 'L-001', $legacyClassId, $now]);
+$legacyStudentId = (int)$legacyPdo->lastInsertId();
+$legacyPdo->prepare(
+    'INSERT INTO absences (student_id, absence_date, registered_by, created_at) VALUES (?, ?, ?, ?)'
+)->execute([$legacyStudentId, '2025-09-10', $legacyUserId, $now]);
+
+Database::migrate($legacyPdo);
+$legacySnapshot = $legacyPdo->query('SELECT class_id FROM absences LIMIT 1')->fetchColumn();
+$legacyMigrationCount = (int)$legacyPdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn();
+check((int)$legacySnapshot === $legacyClassId, 'migração preenche a turma de ausências existentes no banco legado');
+check($legacyMigrationCount === 2, 'upgrade legado registra as duas migrações sem recriar dados existentes');
+$legacyPdo = null;
+
 unset(
     $storedHash,
     $checkUnchanged,
@@ -175,11 +223,12 @@ unset(
     $guardianInsert,
     $passwordQuery,
     $failedStatus,
-    $retry
+    $retry,
+    $tryToRewriteSnapshot
 );
 $pdo = null;
 gc_collect_cycles();
-foreach ([$databasePath, $databasePath . '-journal', $databasePath . '-wal', $databasePath . '-shm'] as $file) {
+foreach ([$databasePath, $legacyDatabasePath, $databasePath . '-journal', $databasePath . '-wal', $databasePath . '-shm'] as $file) {
     if (is_file($file)) {
         unlink($file);
     }

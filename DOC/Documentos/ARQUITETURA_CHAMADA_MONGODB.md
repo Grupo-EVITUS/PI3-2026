@@ -1,64 +1,77 @@
 # Chamada completa do SAA em MongoDB
 
-**Status:** desenho de implementação para revisão  
+**Status:** desenho de implementação revisado  
 **Branch de trabalho:** `feat/saa-mongodb-complete-attendance`  
 **Issue:** #46
 
-## Objetivo
+## Diretriz de integração
 
-Registrar uma chamada por turma e data com situação explícita de cada aluno elegível. A chamada completa é a fonte confiável para frequência; ocorrências e notificações são efeitos derivados.
+A aplicação executável na `main` usa PHP e SQLite; a branch `feat/php-mongodb` contém um rewrite PHP + MongoDB divergente e ainda registra ausências individuais. A PR #55 implementa chamada completa em SQLite. Ambas são referências para port seletivo; nenhuma será mesclada integralmente. A implementação trabalha na branch nova baseada na main atual, preservando os commits recentes de histórico, snapshot de turma e integridade.
 
-## Modelo proposto
+A mudança deve substituir o runtime de persistência de forma coerente. Não adicionar escrita/leitura Mongo enquanto auth, cadastros e ocorrências continuam lendo SQLite; dual-store criaria duas fontes de verdade. A chamada completa só será implementada depois do baseline Mongo passar pelos gates abaixo.
 
-### `attendance_sessions` — registro canônico
+## Plano em três etapas
+
+### 1. Portar runtime para MongoDB e comprovar paridade
+
+Portar dependências e configuração Mongo, bootstrap, modelos/serviços, autenticação e limiter, cadastros, ocorrências e justificativas, notificações e fila de e-mail, seeds/scripts, Docker/CI e testes. Manter os fluxos atuais sem introduzir frequência por chamada nesta etapa.
+
+Gate: comportamento equivalente para login, permissões, CRUD, justificativas, fila/reenvio e auditoria; lint, testes unitários, integração MongoDB, aceitação HTTP e CI aprovados na topologia definida. Nenhum dual-write.
+
+### 2. Backup, importação e cutover
+
+Criar backup consistente e importador SQLite→Mongo retomável, com dry-run, mapa de IDs legados para ObjectId, sem envio de e-mail, preservando relacionamentos, datas, hashes, fila pendente e snapshot de turma. Ensaiar em cópia, reconciliar contagens e referências, criar índices após deduplicação e documentar restauração/rollback. Fazer cutover com escrita congelada.
+
+Históricos de ausências sem chamadas completas não permitem inferir presenças; não serão reconstruídos. Gate: ensaio reconciliado e restauração testada. Se a instalação não tiver dados que precisem ser migrados, registrar essa decisão e a evidência em vez de inventar uma importação.
+
+### 3. Chamada completa em MongoDB, testes e pareceres
+
+Implementar `attendance_sessions` e efeitos derivados somente depois dos gates anteriores. Ao fim da etapa, produzir relatórios separados de qualidade e cibersegurança apoiados em evidência do commit candidato.
+
+## Modelo canônico da chamada
+
+### `attendance_sessions`
 
 Um documento por turma e data, com:
 
 - `class_id`, nome e período da turma no dia;
-- data da chamada, usuário responsável e instante de criação;
-- `entries[]` com `student_id`, `enrollment_id`, snapshots mínimos de nome/matrícula e status `PRESENT` ou `ABSENT`;
-- `payload_hash` do roster e das respostas normalizadas;
-- estado `PROCESSING` ou `COMPLETED`, mais dados de auditoria do processamento.
+- data, usuário responsável e instante de criação;
+- `entries[]`: `student_id`, `enrollment_id`, snapshots mínimos de nome/matrícula e status `PRESENT` ou `ABSENT`;
+- hash canônico do roster e dos estados normalizados;
+- `PROCESSING` ou `COMPLETED`, tentativas e estado operacional de recuperação.
 
-Índice único: `{ class_id: 1, date: 1 }`. O servidor obtém a matrícula válida para a data e compara o roster completo: nenhum aluno elegível pode faltar e nenhum aluno de outra turma, inativo ou fora do período pode entrar. A gravação inicial de um documento da sessão é atômica no MongoDB.
+Índice único: `{ class_id: 1, date: 1 }`. O servidor calcula o roster a partir da matrícula válida na data, com limites de vigência explícitos, e valida completude, turma, período e status allowlist. O snapshot preserva matrícula, turma e período históricos. A inserção de um documento completo é atômica no MongoDB.
 
-### `attendance_records` — projeção de ausências
+Hash igual: retomar uma sessão `PROCESSING` ou devolver o resultado da `COMPLETED`. Hash diferente para a mesma turma/data: conflito, sem sobrescrever; correções exigem ação explícita e auditada.
 
-Manter esta coleção para o fluxo existente de justificativas e histórico. Criar um registro apenas para cada aluno `ABSENT`, acrescentando a referência à sessão. Não criar registros de presença fictícios em históricos anteriores.
+## Projeções, notificações e recuperação
 
-### Notificações
+Manter `attendance_records` para ausências, justificativas e histórico. Cada ausência criada pelo worker referencia a sessão e tem índice idempotente por sessão/aluno; configurar o índice como parcial quando necessário para não invalidar documentos legados. Conservar ocorrências pré-existentes sem recriá-las e sem reenviar e-mail durante importação ou retomada.
 
-Criar/enfileirar comunicação somente para ausentes e responsáveis elegíveis. Cada ocorrência e notificação precisa de uma chave idempotente derivada da sessão, aluno e responsável, além dos índices únicos correspondentes. O worker pode retomar sessões em `PROCESSING`: upserts e chaves idempotentes impedem duplicações se o processo cair após uma gravação parcial. Marcar a sessão `COMPLETED` somente depois que as ocorrências e comunicações estiverem persistidas na fila.
+Uma rotina recuperável busca sessões `PROCESSING`, reivindica trabalho com lease, contador de tentativas e próximo retry, e faz upserts idempotentes. Chaves únicas para jobs de comunicação: sessão/aluno/responsável. Marcar `COMPLETED` somente após ocorrências e notificações terem sido persistidas na fila. Métricas futuras consultam só sessões `COMPLETED`.
 
-Essa abordagem evita depender de transações multi-documento. Se a implementação optar por transações, o MongoDB e o CI deverão usar replica set; MongoDB standalone não oferece transações multi-documento.
+A idempotência do job não torna SMTP exatamente-uma-vez: se a conexão cair após o provedor aceitar o e-mail e antes do ACK, pode ocorrer reenvio. Documentar a semântica como pelo-menos-uma-vez e, quando disponível, usar chave/idempotência do provedor.
 
-## Regras de API e concorrência
+Esta abordagem evita depender de transações multi-documento. Se forem escolhidas transações, MongoDB e CI/deploy precisam usar replica set. MongoDB standalone não oferece transações multi-documento.
 
-1. A interface envia o estado de todos os alunos; o backend recalcula e valida a lista elegível.
-2. Sessão duplicada para turma/data retorna conflito sem alterar a sessão anterior.
-3. Uma submissão idêntica pode retomar uma sessão interrompida usando `payload_hash`; payload diferente exige conflito e correção explícita auditada.
-4. O endpoint legado de ausência individual não pode converter presença em falta nem alterar uma sessão concluída. Para chamadas controladas por sessão, deve rejeitar conflito.
-5. A ocorrência não é apagada ou recriada em reenvios de e-mail; reenviar afeta apenas a comunicação.
+## Limites e segurança
 
-## Compatibilidade histórica e relatórios futuros
+- Manter o documento abaixo de 16 MiB com margem operacional; não embutir conteúdo de e-mail, tokens ou histórico sem limite no roster.
+- Validar o roster no servidor e construir filtros Mongo por allowlist; rejeitar operadores NoSQL e IDs inválidos.
+- Manter autorização e escopo da turma, CSRF nas ações web, auditoria de correções e proteção de tokens/PII em respostas e logs.
+- A chamada legada individual não pode converter presença em falta após uma sessão completa; qualquer correção posterior deve ser explícita e auditada.
 
-- Sessões antigas inexistentes não serão reconstruídas a partir de ausências: os presentes históricos são desconhecidos.
-- Métricas de frequência usarão somente sessões `COMPLETED`.
-- Snapshots de turma e matrícula preservam a turma correspondente à data, mesmo após transferência ou renomeação.
-- Gráficos e relatórios serão adicionados depois da validação do fluxo de chamada.
+## Verificações obrigatórias da etapa 3
 
-## Verificações obrigatórias
+- Roster total/parcial/excedente e matrícula com início/fim na data.
+- Turma somente com presentes, somente com ausentes e estados mistos.
+- Duplicidade concorrente e hash idêntico/divergente.
+- Falhas entre sessão, projeção de ausência, fila e confirmação; retry não duplica.
+- Responsáveis inelegíveis, comunicação falha e reenvio sem alteração da frequência.
+- Migração preserva ausência e justificativa antigas sem inferir presença ou disparar e-mail.
+- Autorização, CSRF, IDOR, validação de ObjectId, injeção NoSQL, PII/tokens e tamanho BSON.
+- Lint, unit, integração MongoDB e aceitação no SHA candidato; registrar a versão e topologia do Mongo usado.
 
-- Roster completo, parcial, excedente, com aluno transferido e com matrícula fora da data.
-- Chamadas com todos presentes, todos ausentes e combinação de estados.
-- Submissões simultâneas ou duplicadas para turma/data.
-- Falha após salvar sessão, após projetar ocorrência e após enfileirar comunicação; repetição deve concluir sem duplicatas.
-- Responsável ausente/inativo ou sem e-mail elegível.
-- Reenvio de e-mail sem alteração da chamada ou das métricas.
-- Autorização, CSRF, validação de ObjectId e rejeição de operadores NoSQL em entradas.
-- Tamanho máximo e estabilidade do documento da sessão.
-- Testes de integração executados contra MongoDB; registrar versão e configuração (standalone ou replica set).
+## Limite deste documento
 
-## Limite desta etapa
-
-Este arquivo registra o desenho acordado pelos revisores. Não representa implementação concluída nem evidência de testes. A implementação deve atualizar schema/índices, modelos, serviços, endpoint, interface, worker e testes antes de aprovar a issue #46.
+Este é um plano revisado e não representa implementação concluída nem evidência de testes. A issue #46 permanece aberta; gráficos e relatórios por período são trabalho posterior, depois da base Mongo e da chamada completa.

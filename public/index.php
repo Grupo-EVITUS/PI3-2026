@@ -137,7 +137,7 @@ try {
             . "(SELECT COUNT(*) FROM communications c WHERE c.absence_id = a.id) AS communication_count, "
             . "(SELECT COUNT(*) FROM communications c WHERE c.absence_id = a.id AND c.status = 'FALHA') AS failed_count "
             . "FROM absences a JOIN students s ON s.id = a.student_id "
-            . "JOIN classes cl ON cl.id = s.class_id LEFT JOIN justifications j ON j.absence_id = a.id "
+            . "JOIN classes cl ON cl.id = a.class_id LEFT JOIN justifications j ON j.absence_id = a.id "
             . "$where ORDER BY a.absence_date DESC, a.id DESC",
             $parameters
         );
@@ -213,7 +213,7 @@ try {
         $absenceStatement = $pdo->prepare(
             'SELECT a.*, s.name AS student_name, cl.name AS class_name, cl.grade, '
             . 'u.name AS registered_by_name FROM absences a '
-            . 'JOIN students s ON s.id = a.student_id JOIN classes cl ON cl.id = s.class_id '
+            . 'JOIN students s ON s.id = a.student_id JOIN classes cl ON cl.id = a.class_id '
             . 'JOIN users u ON u.id = a.registered_by WHERE a.id = ?'
         );
         $absenceStatement->execute([$absenceId]);

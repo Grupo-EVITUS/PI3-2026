@@ -61,6 +61,21 @@ Esta abordagem evita depender de transações multi-documento. Se forem escolhid
 - Manter autorização e escopo da turma, CSRF nas ações web, auditoria de correções e proteção de tokens/PII em respostas e logs.
 - A chamada legada individual não pode converter presença em falta após uma sessão completa; qualquer correção posterior deve ser explícita e auditada.
 
+## Compatibilidade dos dados legados a resolver na etapa 2
+
+A estrutura SQLite atual não fornece alguns campos exigidos pelo modelo Mongo documentado na branch de referência. O importador e o runtime não devem preencher lacunas com dados inventados.
+
+| Dado | Situação no SQLite | Tratamento necessário |
+|---|---|---|
+| Data de nascimento e código escolar | `birth_date` não existe; `registration_no` é opcional | Preservar ausência/desconhecido; permitir configuração posterior e não bloquear a migração por valor fictício. |
+| Período letivo e matrícula histórica | Turmas têm `academic_year`, mas não datas de período; alunos guardam somente turma atual | Criar configuração explícita de calendário/matrícula; não usar 1º de janeiro, `created_at` ou turma atual como datas históricas presumidas. |
+| Snapshot de turma em faltas antigas | Migração 002 preenche faltas antigas usando a turma atual do aluno | Marcar a proveniência/limitação; só snapshots comprovadamente capturados podem ser tratados como históricos confiáveis. |
+| Responsáveis e vínculos | E-mail não é único; relacionamento fica na tabela de vínculo e o modelo de referência embute no máximo 3 vínculos por aluno | Detectar duplicatas/excessos, reconciliar sem descartar contatos e preservar vínculos por aluno. Não impor unicidade até deduplicação. |
+| Status de ausência | `PENDENTE`/`RESPONDIDA` descreve a justificativa | Migrar como status de ausência e estado de justificativa separados; falta justificada continua sendo falta nas métricas. |
+| Perfil e comunicação pendente | `DIRETOR` é somente leitura; corpo da fila pode conter token em claro | Mapear Diretor para perfil read-only; importar filas sem enviar e-mails e sem registrar tokens em claro nos logs. |
+
+O importador deve oferecer backup consistente, dry-run, mapeamento estável de IDs SQLite→ObjectId, importação em ordem de dependências, retomada, reconciliação de contagens/referências/estados, e teste de restauração. Ocorrências pré-existentes precisam ser reconhecidas por chave antes de criar projeções para não duplicar comunicação.
+
 ## Verificações obrigatórias da etapa 3
 
 - Roster total/parcial/excedente e matrícula com início/fim na data.

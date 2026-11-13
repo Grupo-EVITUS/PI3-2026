@@ -10,23 +10,25 @@ A aplicação executável na `main` usa PHP e SQLite; a branch `feat/php-mongodb
 
 A mudança deve substituir o runtime de persistência de forma coerente. Não adicionar escrita/leitura Mongo enquanto auth, cadastros e ocorrências continuam lendo SQLite; dual-store criaria duas fontes de verdade. A chamada completa só será implementada depois do baseline Mongo passar pelos gates abaixo.
 
-## Plano em três etapas
+## Plano em seis etapas
 
-### 1. Portar runtime para MongoDB e comprovar paridade
+### 1. Inventário, arquitetura e isolamento
+Concluídos no planejamento: comparar branches/PRs, atualizar a issue, criar `feat/saa-mongodb-complete-attendance` a partir da main e registrar riscos de incompatibilidade. A main não é alterada.
 
-Portar dependências e configuração Mongo, bootstrap, modelos/serviços, autenticação e limiter, cadastros, ocorrências e justificativas, notificações e fila de e-mail, seeds/scripts, Docker/CI e testes. Manter os fluxos atuais sem introduzir frequência por chamada nesta etapa.
+### 2. Base MongoDB
+Portar dependências, configuração, cliente/conexão, inicialização, validators, índices, seed e health check. Fixar versão/topologia Mongo e preparar CI compatível. Gate: bootstrap idempotente, conexão e testes de schema.
 
-Gate: comportamento equivalente para login, permissões, CRUD, justificativas, fila/reenvio e auditoria; lint, testes unitários, integração MongoDB, aceitação HTTP e CI aprovados na topologia definida. Nenhum dual-write.
+### 3. Port do runtime e paridade
+Portar autenticação/permissões, cadastros, ocorrências/justificativas, notificações/fila, scripts, telas e testes. Sem SQLite+Mongo simultâneos. Gate: fluxos atuais equivalentes, lint, unit, integração Mongo, aceitação HTTP e CI.
 
-### 2. Backup, importação e cutover
+### 4. Migração de dados e cutover ensaiado
+Construir backup consistente e importador SQLite→Mongo com dry-run, IDs mapeados de forma retomável, sem envio de e-mail. Reconciliar contagens, referências, estados, datas e fila pendente; testar restauração e rollback. Não inventar valores ausentes nem presenças históricas. Cutover real depende de aprovação operacional.
 
-Criar backup consistente e importador SQLite→Mongo retomável, com dry-run, mapa de IDs legados para ObjectId, sem envio de e-mail, preservando relacionamentos, datas, hashes, fila pendente e snapshot de turma. Ensaiar em cópia, reconciliar contagens e referências, criar índices após deduplicação e documentar restauração/rollback. Fazer cutover com escrita congelada.
+### 5. Chamada completa em MongoDB
+Implementar `attendance_sessions` com índice único por turma/data, roster completo validado pelo servidor, snapshots de turma/período e tratamento explícito de concorrência. Ocorrências e notificações usam outbox/projeções idempotentes com lease e retry. Gate: testes de roster, transferências, duplicidades, falhas parciais, retomada e comunicações.
 
-Históricos de ausências sem chamadas completas não permitem inferir presenças; não serão reconstruídos. Gate: ensaio reconciliado e restauração testada. Se a instalação não tiver dados que precisem ser migrados, registrar essa decisão e a evidência em vez de inventar uma importação.
-
-### 3. Chamada completa em MongoDB, testes e pareceres
-
-Implementar `attendance_sessions` e efeitos derivados somente depois dos gates anteriores. Ao fim da etapa, produzir relatórios separados de qualidade e cibersegurança apoiados em evidência do commit candidato.
+### 6. Dashboards, relatórios e pareceres
+Implementar visão da escola, gráfico individual e gráfico por turma com seletor dentro da seção Turmas; emitir relatórios por semana, mês, semestre, ano e intervalo personalizado, com calendário letivo configurável. Após regressão/CI aprovados, entregar relatórios separados de qualidade e arquitetura de dados, com evidências e limitações.
 
 ## Modelo canônico da chamada
 

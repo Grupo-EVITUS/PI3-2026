@@ -1,9 +1,9 @@
-<?php $pageTitle = 'Registrar ausência'; ?>
+<?php $pageTitle = 'Registrar chamada'; ?>
 <section class="page-heading">
     <div>
         <span class="eyebrow">Registro diário</span>
-        <h1>Registrar ausência</h1>
-        <p>Selecione a turma e todos os alunos ausentes nesta data.</p>
+        <h1>Registrar chamada</h1>
+        <p>Registre a chamada completa. Cada aluno deve ser marcado como presente ou ausente.</p>
     </div>
     <a class="button button-quiet" href="/ocorrencias">Voltar às ocorrências</a>
 </section>
@@ -43,24 +43,26 @@
             <input id="absence_date" name="absence_date" type="date" required value="<?= e($absenceDate) ?>">
         </div>
         <fieldset class="student-picker">
-            <legend>Alunos <span class="legend-note">Marque um ou mais nomes</span></legend>
+            <legend>Chamada da turma <span class="legend-note">Informe a situação de cada aluno</span></legend>
             <?php if (!$students): ?>
                 <p class="muted">Não há alunos ativos nesta turma.</p>
             <?php else: ?>
                 <div class="student-grid">
                     <?php foreach ($students as $student): ?>
-                        <label class="student-option">
-                            <input type="checkbox" name="student_ids[]" value="<?= (int)$student['id'] ?>"
-                                <?= in_array((int)$student['id'], $selectedStudents, true) ? 'checked' : '' ?>>
-                            <span><strong><?= e($student['name']) ?></strong><small><?= $student['registration_no'] ? e($student['registration_no']) : 'Sem matrícula informada' ?></small></span>
-                        </label>
+                        <fieldset class="student-option attendance-option">
+                            <legend><strong><?= e($student['name']) ?></strong><small><?= $student['registration_no'] ? e($student['registration_no']) : 'Sem matrícula informada' ?></small></legend>
+                            <label><input type="radio" name="attendance[<?= (int)$student['id'] ?>]" value="PRESENTE" required
+                                <?= ($selectedAttendance[(int)$student['id']] ?? '') === 'PRESENTE' ? 'checked' : '' ?>> Presente</label>
+                            <label><input type="radio" name="attendance[<?= (int)$student['id'] ?>]" value="AUSENTE" required
+                                <?= ($selectedAttendance[(int)$student['id']] ?? '') === 'AUSENTE' ? 'checked' : '' ?>> Ausente</label>
+                        </fieldset>
                     <?php endforeach; ?>
                 </div>
-                <p class="form-hint">Cada aluno pode ter uma ausência por dia.</p>
+                <p class="form-hint">A chamada só será salva quando todos os alunos estiverem classificados. E-mails são enfileirados apenas para ausentes.</p>
             <?php endif; ?>
         </fieldset>
         <div class="form-actions">
-            <button class="button button-primary" type="submit">Registrar e colocar e-mails na fila</button>
+            <button class="button button-primary" type="submit">Concluir chamada e notificar ausentes</button>
         </div>
     </form>
 <?php else: ?>

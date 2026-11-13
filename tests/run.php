@@ -56,7 +56,11 @@ $pdo->prepare('INSERT INTO student_guardians (student_id, guardian_id) VALUES (?
 $pdo->prepare('INSERT INTO student_guardians (student_id, guardian_id) VALUES (?, ?)')->execute([$studentOne, $guardianTwo]);
 
 $date = date('Y-m-d');
-$result = Services::recordAbsences($pdo, $classId, [$studentOne, $studentTwo], $date, $userId);
+$result = Services::recordAttendance($pdo, $classId, [
+    $studentOne => 'AUSENTE',
+    $studentTwo => 'AUSENTE',
+    $studentThree => 'PRESENTE',
+], $date, $userId);
 check(count($result['absences']) === 2, 'registra vários alunos na mesma operação');
 check(count($result['notifications']) === 2, 'notifica todos os responsáveis do aluno');
 check($result['without_guardians'] === ['Aluno Dois'], 'sinaliza aluno sem responsável cadastrado');
@@ -92,7 +96,11 @@ expectException(
 );
 
 expectException(
-    static fn() => Services::recordAbsences($pdo, $classId, [$studentOne, $studentThree], $date, $userId),
+    static fn() => Services::recordAttendance($pdo, $classId, [
+        $studentOne => 'AUSENTE',
+        $studentTwo => 'PRESENTE',
+        $studentThree => 'AUSENTE',
+    ], $date, $userId),
     DomainException::class,
     'bloqueia ausência duplicada no mesmo aluno e data'
 );
@@ -167,7 +175,11 @@ check(password_verify('SenhaForte123!', $passwordQuery->fetchColumn()), 'cria us
 
 $pdo->prepare('INSERT INTO student_guardians (student_id, guardian_id) VALUES (?, ?)')->execute([$studentThree, $guardianOne]);
 $failureDate = date('Y-m-d', strtotime('+1 day'));
-$failureBatch = Services::recordAbsences($pdo, $classId, [$studentThree], $failureDate, $userId);
+$failureBatch = Services::recordAttendance($pdo, $classId, [
+    $studentOne => 'PRESENTE',
+    $studentTwo => 'PRESENTE',
+    $studentThree => 'AUSENTE',
+], $failureDate, $userId);
 $failedCommunicationId = (int)$failureBatch['notifications'][0]['communication_id'];
 putenv('MAIL_MODE=smtp');
 putenv('SMTP_HOST=');

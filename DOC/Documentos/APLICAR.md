@@ -1,17 +1,5 @@
-# Aplicação das correções de documentação — Grupo EVITUS / PI3-2026
+# Nota de arquivo — Grupo EVITUS / PI3-2026
 
-O pacote altera **apenas a pasta `Sprint/`**. O código PHP, o banco SQLite, os materiais em `Diagramas/` e o ZIP Flask/MongoDB não são modificados.
+Este documento descrevia a aplicação manual de um pacote antigo que alterava apenas materiais sob `Sprint/`. As instruções de extração e a afirmação de que nada havia sido enviado ao GitHub ficaram desatualizadas após a integração da documentação na branch `main` pelo PR #51, em 13/11/2026.
 
-## Como aplicar com segurança
-
-1. Faça backup ou uma branch de trabalho no seu clone local do repositório.
-2. Extraia este ZIP na raiz do clone `PI3-2026`, permitindo substituir os arquivos sob `Sprint/`.
-3. No terminal, confira: `git status --short` e `git diff -- Sprint`.
-4. Revise os textos, especialmente as datas e o escopo acordado com o grupo.
-5. Depois da aprovação da equipe, faça commit em uma branch e abra um Pull Request.
-
-## Justificativa
-
-Corrigidos links quebrados, números de issues trocados, menções a issues inexistentes, divergências da arquitetura e afirmações sobre entregas sem evidência. Mantida distinção entre as datas históricas das sprints e os commits efetivos de 27/10.
-
-**Importante:** o conector GitHub recusou escrita com HTTP 403; por isso nenhuma mudança foi enviada ao repositório remoto. Este pacote contém as versões prontas para revisão e aplicação manual.
+Use os arquivos atualmente versionados no repositório como fonte de verdade. Não aplique o ZIP antigo sobre o clone atual. O ZIP `saa_flask_mongodb_dashboard_atualizado.zip` também é material anterior; o MVP executável documentado neste repositório usa PHP e SQLite.

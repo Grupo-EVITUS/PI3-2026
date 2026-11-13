@@ -119,6 +119,22 @@ Services::saveClass($pdo, [
     'academic_year' => '2026',
     'shift' => 'Tarde',
 ]);
+Services::saveStudent($pdo, [
+    'id' => (string)$studentOne,
+    'name' => 'Aluno Um',
+    'registration_no' => 'T-001',
+    'class_id' => (string)$newClassId,
+]);
+check(
+    Services::publicJustification($pdo, $token)['class_name'] === 'Turma Teste',
+    'transferência do aluno não altera a turma registrada na ocorrência histórica'
+);
+$tryToRewriteSnapshot = $pdo->prepare('UPDATE absences SET class_id = ? WHERE id = ?');
+expectException(
+    static fn() => $tryToRewriteSnapshot->execute([$newClassId, (int)$result['absences'][0]['id']]),
+    PDOException::class,
+    'snapshot da turma da ausência é imutável'
+);
 $newStudentId = Services::saveStudent($pdo, [
     'name' => 'Aluno Novo',
     'registration_no' => 'T-004',
@@ -168,6 +184,10 @@ check($failureAbsenceId > 0, 'reenviar preserva e referencia a ocorrência origi
 putenv('MAIL_MODE=log');
 check(processMailQueue($pdo, 1) === 1, 'processa o reenvio');
 
+Database::migrate($pdo);
+$appliedMigrations = (int)$pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn();
+check($appliedMigrations === 2, 'migrações são rastreadas e podem ser reaplicadas sem duplicação');
+
 unset(
     $storedHash,
     $checkUnchanged,
@@ -175,7 +195,8 @@ unset(
     $guardianInsert,
     $passwordQuery,
     $failedStatus,
-    $retry
+    $retry,
+    $tryToRewriteSnapshot
 );
 $pdo = null;
 gc_collect_cycles();

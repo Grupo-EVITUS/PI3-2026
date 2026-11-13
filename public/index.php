@@ -162,22 +162,26 @@ try {
             requirePost();
             try {
                 $date = trim($_POST['absence_date'] ?? '') ?: date('Y-m-d');
-                $result = Services::recordAbsences(
+                $attendance = is_array($_POST['attendance'] ?? null) ? $_POST['attendance'] : [];
+                $result = Services::recordAttendance(
                     $pdo,
                     (int)($_POST['class_id'] ?? 0),
-                    is_array($_POST['student_ids'] ?? null) ? $_POST['student_ids'] : [],
+                    $attendance,
                     $date,
                     (int)$_SESSION['user_id']
                 );
                 $ids = array_column($result['absences'], 'id');
-                $placeholders = implode(',', array_fill(0, count($ids), '?'));
-                $communications = queryRows(
-                    $pdo,
-                    "SELECT c.id, c.absence_id, c.email_to, c.status, g.name AS guardian_name "
-                    . "FROM communications c JOIN guardians g ON g.id = c.guardian_id "
-                    . "WHERE c.absence_id IN ($placeholders) ORDER BY c.id",
-                    $ids
-                );
+                $communications = [];
+                if ($ids !== []) {
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $communications = queryRows(
+                        $pdo,
+                        "SELECT c.id, c.absence_id, c.email_to, c.status, g.name AS guardian_name "
+                        . "FROM communications c JOIN guardians g ON g.id = c.guardian_id "
+                        . "WHERE c.absence_id IN ($placeholders) ORDER BY c.id",
+                        $ids
+                    );
+                }
                 render('registration_result.php', [
                     'result' => $result,
                     'communications' => $communications,
@@ -190,7 +194,7 @@ try {
                     'students' => $students,
                     'error' => $error->getMessage(),
                     'selectedClass' => $selectedClass,
-                    'selectedStudents' => array_map('intval', is_array($_POST['student_ids'] ?? null) ? $_POST['student_ids'] : []),
+                    'selectedAttendance' => is_array($_POST['attendance'] ?? null) ? $_POST['attendance'] : [],
                     'absenceDate' => $_POST['absence_date'] ?? date('Y-m-d'),
                 ]);
             }
@@ -200,7 +204,7 @@ try {
                 'students' => $students,
                 'error' => null,
                 'selectedClass' => $selectedClass,
-                'selectedStudents' => [],
+                'selectedAttendance' => [],
                 'absenceDate' => date('Y-m-d'),
             ]);
         }

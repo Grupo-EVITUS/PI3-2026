@@ -11,57 +11,100 @@ final class Services
         'OUTRO' => 'Outro',
     ];
 
-    public static function recordAbsences(PDO $pdo, int $classId, array $studentIds, string $absenceDate, int $userId): array
+    public static function recordAttendance(PDO $pdo, int $classId, array $studentStatuses, string $absenceDate, int $userId): array
     {
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $absenceDate);
         if (!$date || $date->format('Y-m-d') !== $absenceDate) {
             throw new InvalidArgumentException('Informe uma data válida.');
         }
-        $studentIds = self::normalizeIds($studentIds);
-        if ($studentIds === []) {
-            throw new InvalidArgumentException('Selecione pelo menos um aluno.');
+        if ($classId < 1 || $userId < 1 || $studentStatuses === []) {
+            throw new InvalidArgumentException('Selecione uma turma com alunos e informe a chamada completa.');
         }
 
-        $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
-        $studentsQuery = $pdo->prepare(
-            "SELECT id, name FROM students WHERE active = 1 AND class_id = ? AND id IN ($placeholders) ORDER BY name"
-        );
-        $studentsQuery->execute([$classId, ...$studentIds]);
-        $students = $studentsQuery->fetchAll();
-        if (count($students) !== count($studentIds)) {
-            throw new InvalidArgumentException('Um ou mais alunos não pertencem à turma selecionada.');
-        }
-        $classQuery = $pdo->prepare('SELECT name FROM classes WHERE id = ? AND active = 1');
-        $classQuery->execute([$classId]);
-        $className = $classQuery->fetchColumn();
-        if (!$className) {
-            throw new InvalidArgumentException('A turma selecionada não está disponível.');
-        }
-
-        $duplicateQuery = $pdo->prepare(
-            "SELECT s.name FROM absences a JOIN students s ON s.id = a.student_id "
-            . "WHERE a.absence_date = ? AND a.student_id IN ($placeholders)"
-        );
-        $duplicateQuery->execute([$absenceDate, ...$studentIds]);
-        $duplicateNames = $duplicateQuery->fetchAll(PDO::FETCH_COLUMN);
-        if ($duplicateNames !== []) {
-            throw new DomainException(
-                'Já existe ausência nesta data para: ' . implode(', ', $duplicateNames)
-                . '. Nenhuma ausência foi registrada.'
-            );
-        }
-
-        $absenceRows = [];
-        $withoutGuardians = [];
-        $notifications = [];
         $pdo->beginTransaction();
         try {
-            foreach ($students as $student) {
-                $insertAbsence = $pdo->prepare(
-                    "INSERT INTO absences (student_id, class_id, absence_date, status, registered_by, created_at) "
-                    . "VALUES (?, ?, ?, 'PENDENTE', ?, ?)"
+            $studentsQuery = $pdo->prepare(
+                'SELECT id, name FROM students WHERE active = 1 AND class_id = ? ORDER BY name'
+            );
+            $studentsQuery->execute([$classId]);
+            $students = $studentsQuery->fetchAll();
+            $normalizedStatuses = [];
+            foreach ($studentStatuses as $rawId => $status) {
+                $id = filter_var((string)$rawId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                if ($id === false || !in_array($status, ['PRESENTE', 'AUSENTE'], true)) {
+                    throw new InvalidArgumentException('A chamada contém aluno ou situação inválida.');
+                }
+                $normalizedStatuses[(int)$id] = $status;
+            }
+            $rosterIds = array_map(static fn(array $student): int => (int)$student['id'], $students);
+            $submittedIds = array_keys($normalizedStatuses);
+            sort($rosterIds);
+            sort($submittedIds);
+            if ($rosterIds === [] || $rosterIds !== $submittedIds) {
+                throw new InvalidArgumentException('Informe a situação de todos os alunos ativos da turma selecionada.');
+            }
+            $classQuery = $pdo->prepare('SELECT name FROM classes WHERE id = ? AND active = 1');
+            $classQuery->execute([$classId]);
+            $className = $classQuery->fetchColumn();
+            if (!$className) {
+                throw new InvalidArgumentException('A turma selecionada não está disponível.');
+            }
+
+            $existingSession = $pdo->prepare('SELECT 1 FROM attendance_sessions WHERE class_id = ? AND attendance_date = ?');
+            $existingSession->execute([$classId, $absenceDate]);
+            if ($existingSession->fetchColumn()) {
+                throw new DomainException('Já existe uma chamada para esta turma e data. Nenhuma alteração foi realizada.');
+            }
+
+            $absentIds = array_keys(array_filter($normalizedStatuses, static fn(string $status): bool => $status === 'AUSENTE'));
+            if ($absentIds !== []) {
+                $placeholders = implode(',', array_fill(0, count($absentIds), '?'));
+                $duplicateQuery = $pdo->prepare(
+                    "SELECT s.name FROM absences a JOIN students s ON s.id = a.student_id "
+                    . "WHERE a.absence_date = ? AND a.student_id IN ($placeholders)"
                 );
-                $insertAbsence->execute([(int)$student['id'], $classId, $absenceDate, $userId, Database::now()]);
+                $duplicateQuery->execute([$absenceDate, ...$absentIds]);
+                $duplicateNames = $duplicateQuery->fetchAll(PDO::FETCH_COLUMN);
+                if ($duplicateNames !== []) {
+                    throw new DomainException(
+                        'Já existe ausência nesta data para: ' . implode(', ', $duplicateNames)
+                        . '. Nenhuma chamada foi registrada.'
+                    );
+                }
+            }
+
+            $absenceRows = [];
+            $withoutGuardians = [];
+            $notifications = [];
+            $now = Database::now();
+            $insertSession = $pdo->prepare(
+                'INSERT INTO attendance_sessions (class_id, attendance_date, completed_by, completed_at) VALUES (?, ?, ?, ?)'
+            );
+            $insertSession->execute([$classId, $absenceDate, $userId, $now]);
+            $sessionId = (int)$pdo->lastInsertId();
+            audit(
+                $pdo,
+                $userId,
+                'CHAMADA_CONCLUIDA',
+                'chamada',
+                $sessionId,
+                'Turma ' . $classId . '; data ' . $absenceDate
+            );
+            $insertAttendance = $pdo->prepare(
+                'INSERT INTO attendance_records (session_id, student_id, status, created_at) VALUES (?, ?, ?, ?)'
+            );
+            foreach ($students as $student) {
+                $studentId = (int)$student['id'];
+                $status = $normalizedStatuses[$studentId];
+                $insertAttendance->execute([$sessionId, $studentId, $status, $now]);
+                if ($status !== 'AUSENTE') {
+                    continue;
+                }
+                $insertAbsence = $pdo->prepare(
+                    "INSERT INTO absences (student_id, class_id, attendance_session_id, absence_date, status, registered_by, created_at) "
+                    . "VALUES (?, ?, ?, ?, 'PENDENTE', ?, ?)"
+                );
+                $insertAbsence->execute([$studentId, $classId, $sessionId, $absenceDate, $userId, $now]);
                 $absenceId = (int)$pdo->lastInsertId();
                 $absenceRows[] = ['id' => $absenceId, 'student_name' => $student['name']];
                 audit($pdo, $userId, 'AUSENCIA_REGISTRADA', 'ausencia', $absenceId, 'Data ' . $absenceDate);
@@ -71,7 +114,7 @@ final class Services
                     . 'JOIN student_guardians sg ON sg.guardian_id = g.id '
                     . 'WHERE sg.student_id = ? AND g.active = 1 ORDER BY g.id'
                 );
-                $guardianQuery->execute([(int)$student['id']]);
+                $guardianQuery->execute([$studentId]);
                 $guardians = $guardianQuery->fetchAll();
                 if ($guardians === []) {
                     $withoutGuardians[] = $student['name'];
@@ -111,21 +154,32 @@ final class Services
                 }
             }
             $pdo->commit();
+            return [
+                'attendance_session_id' => $sessionId,
+                'absences' => $absenceRows,
+                'attendance_counts' => [
+                    'present' => count($students) - count($absentIds),
+                    'absent' => count($absentIds),
+                    'total' => count($students),
+                ],
+                'without_guardians' => $withoutGuardians,
+                'notifications' => $notifications,
+            ];
         } catch (Throwable $error) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            if ($error instanceof PDOException && str_contains(strtolower($error->getMessage()), 'unique')) {
-                throw new DomainException('Já existe ausência nesta data para um ou mais alunos. Nenhuma ausência foi registrada.');
+            if ($error instanceof PDOException) {
+                $databaseMessage = strtolower($error->getMessage());
+                if (str_contains($databaseMessage, 'attendance_sessions.class_id')) {
+                    throw new DomainException('Já existe uma chamada para esta turma e data. Nenhuma alteração foi realizada.');
+                }
+                if (str_contains($databaseMessage, 'absences.student_id')) {
+                    throw new DomainException('Já existe ausência nesta data para um ou mais alunos. Nenhuma chamada foi registrada.');
+                }
             }
             throw $error;
         }
-
-        return [
-            'absences' => $absenceRows,
-            'without_guardians' => $withoutGuardians,
-            'notifications' => $notifications,
-        ];
     }
 
     public static function retryCommunication(PDO $pdo, int $communicationId, int $userId): int

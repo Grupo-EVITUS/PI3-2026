@@ -1,9 +1,9 @@
 <?php $pageTitle = 'Registro realizado'; ?>
 <section class="page-heading">
     <div>
-        <span class="eyebrow">Operação concluída</span>
-        <h1>Ausências registradas</h1>
-        <p><?= count($result['absences']) ?> ocorrência(s) registrada(s) para <?= e(date('d/m/Y', strtotime($date))) ?>.</p>
+        <span class="eyebrow">Chamada concluída</span>
+        <h1>Resumo da chamada</h1>
+        <p><?= (int)$result['attendance_counts']['total'] ?> aluno(s): <?= (int)$result['attendance_counts']['present'] ?> presente(s) e <?= (int)$result['attendance_counts']['absent'] ?> ausente(s), em <?= e(date('d/m/Y', strtotime($date))) ?>.</p>
     </div>
     <a class="button button-primary" href="/ausencias/registrar">Novo registro</a>
 </section>
@@ -13,7 +13,8 @@
 <?php endif; ?>
 
 <section class="card">
-    <h2>Resumo por aluno</h2>
+    <h2>Ocorrências de ausência</h2>
+    <?php if (!$result['absences']): ?><p class="muted">Nenhuma ausência foi registrada nesta chamada.</p><?php endif; ?>
     <div class="result-list">
         <?php foreach ($result['absences'] as $absence): ?>
             <article class="result-row">

@@ -140,9 +140,9 @@ final class Schema
             'input' => ['$range' => [0, 26]],
             'initialValue' => $safeEmail,
             'in' => ['$replaceAll' => [
-                'input' => '$value',
-                'find' => ['$substrBytes' => ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', '$this', 1]],
-                'replacement' => ['$substrBytes' => ['abcdefghijklmnopqrstuvwxyz', '$this', 1]],
+                'input' => '$$value',
+                'find' => ['$substrBytes' => ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', '$$this', 1]],
+                'replacement' => ['$substrBytes' => ['abcdefghijklmnopqrstuvwxyz', '$$this', 1]],
             ]],
         ]];
         return ['$and' => [

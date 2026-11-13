@@ -1,7 +1,8 @@
 # Baseline de produção e qualidade — SAA
 
 **Data:** 13/11/2026  
-**Branch de trabalho:** `quality/saa-baseline-integrity`  
+**Branch de revisão remota do código:** `fix/saa-absence-class-snapshot`  
+**Branch local de trabalho:** `quality/saa-baseline-integrity`  
 **Base revisada:** `main` em `8585c18af8582de1780018a9144d3df74d8730dc`
 
 ## Fonte de verdade e escopo
@@ -38,8 +39,8 @@ Esta etapa registra o diagnóstico sem introduzir uma refatoração ampla que mi
 
 Foram adicionados testes automatizados para transferência do aluno, imutabilidade do snapshot e reaplicação das migrações. Nesta sessão, o ambiente não possui PHP/`pdo_sqlite`, então `php tests/run.php` não pôde ser executado. A validação SQL com SQLite disponível no ambiente é complementar e não substitui a suíte PHP.
 
-**Status:** implementação em revisão local; QA e arquitetura ainda não aprovados; nenhum commit foi criado ou enviado. Aprovação depende da execução da suíte PHP e da revisão pelos responsáveis designados.
+**Status:** a documentação da baseline foi integrada pelo PR #52 em `c983603` (13/11/2026). A alteração de código descrita nesta revisão está em `fix/saa-absence-class-snapshot` e segue pendente de aprovação de arquitetura e QA. A suíte PHP ainda precisa ser executada; a evidência SQLite isolada não substitui essa execução.
 
 ## Branches e organização
 
-`main` permanece a fonte de verdade. A branch `feat/php-mongodb` contém uma proposta de arquitetura divergente e deve permanecer preservada até decisão explícita de migração. A branch `claude/saa-funcionalidades-sprint5-6` contém alterações associadas ao ZIP legado e também deve ser preservada até triagem. `docs/organiza-documentacao` já está integrada, sem trabalho exclusivo identificado; a exclusão remota ainda não foi confirmada.
+`main` permanece a fonte de verdade. A branch `feat/php-mongodb` contém uma proposta de arquitetura divergente e deve permanecer preservada até decisão explícita de migração. A branch `claude/saa-funcionalidades-sprint5-6` contém alterações associadas ao ZIP legado e também deve ser preservada até triagem. `docs/organiza-documentacao` já não aparecia na lista remota de branches consultada após a integração do PR #51.

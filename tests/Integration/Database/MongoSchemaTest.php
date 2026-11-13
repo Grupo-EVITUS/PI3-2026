@@ -88,6 +88,19 @@ try {
     $badProfile = $user;
     $badProfile['profile'] = 'ADMIN';
     rejected(fn() => $db->users->insertOne($badProfile), 121);
+    $initialAdmin = $user;
+    $initialAdmin['email'] = 'first-admin@example.org';
+    $initialAdmin['email_key'] = 'first-admin@example.org';
+    $initialAdmin['is_initial_admin'] = true;
+    $db->users->insertOne($initialAdmin);
+    $secondInitialAdmin = $user;
+    $secondInitialAdmin['email'] = 'second@example.org';
+    $secondInitialAdmin['email_key'] = 'second@example.org';
+    $secondInitialAdmin['is_initial_admin'] = true;
+    rejected(fn() => $db->users->insertOne($secondInitialAdmin), 11000);
+    $badInitialAdminMarker = $user;
+    $badInitialAdminMarker['is_initial_admin'] = 'true';
+    rejected(fn() => $db->users->insertOne($badInitialAdminMarker), 121);
     rejected(fn() => $db->users->updateOne(['_id' => $userId], ['$set' => ['active' => 1]]), 121);
     check(Schema::emailKey('ÄBC@Example.org') === 'Äbc@example.org', 'Normalização incompatível com NOCASE.');
 

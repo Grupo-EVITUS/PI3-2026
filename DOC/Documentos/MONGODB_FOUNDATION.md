@@ -1,17 +1,33 @@
-# Fundação MongoDB — subetapa 2b.2
+# Fundação MongoDB — subetapa 2b.3
 
 Implementa contratos das dez coleções legadas, índices e aplicação explícita reexecutável.
-O runtime web permanece SQLite até o port integral da etapa 3. Não há dual-write.
+Inclui criação segura da conta inicial e health check interno de prontidão. O runtime web
+permanece SQLite até o port integral da etapa 3. Não há dual-write.
 
 ## Execução
 Após instalar as dependências e configurar MONGODB_URI e MONGODB_DB:
 ```sh
 php bin/init_mongodb.php
 php tests/Integration/Database/MongoSchemaTest.php
+php bin/create_initial_admin_mongodb.php
+php bin/healthcheck_mongodb.php
+php tests/Integration/Database/MongoAdminHealthTest.php
 ```
 O teste usa banco aleatório próprio e o remove ao terminar. Nunca remove a base configurada.
-O inicializador não cria usuário, senha padrão, dados escolares ou e-mails.
+O inicializador não cria usuário, senha padrão, dados escolares ou e-mails. A conta inicial
+é criada separadamente, uma única vez, com perfil `COORDENACAO`; o e-mail e a senha vêm de
+`INITIAL_ADMIN_NAME`, `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD`, injetados por um
+gerenciador seguro de segredos. O comando não aceita credenciais em argumentos e não as imprime.
+Após a primeira conta ou qualquer outro usuário existir, o comando recusa nova inicialização.
+Um índice único parcial também impede duas criações concorrentes da conta inicial.
 Não é executado automaticamente na inicialização web.
+
+O health check é somente leitura, restrito a CLI e confere estado de conexão, coleções,
+validators (`strict`/`error`) e definições de índices (chaves, unicidade e filtro parcial).
+Também rejeita índices sparse, ocultos ou TTL, que poderiam alterar a semântica ou remover
+logs de auditoria. Não retorna URI, nome do banco, documentos nem mensagens do driver.
+Um endpoint HTTP de prontidão será avaliado quando o runtime MongoDB for implementado na etapa 3;
+não se expõe uma rota pública enquanto a aplicação web ainda usa SQLite.
 
 ## Contrato de migração
 - ObjectId em IDs/referências. Mapeamento dos IDs SQLite é trabalho da etapa 4.
@@ -21,6 +37,8 @@ Não é executado automaticamente na inicialização web.
 - users.email_key é a dobra ASCII de email, como SQLite NOCASE.
   Schema::emailKey calcula a chave; o validator confere a igualdade no servidor.
   O índice único não depende de collation Unicode diferente do SQLite.
+- users.is_initial_admin é opcional; quando true, um índice único parcial limita a criação
+  da conta administrativa inicial a uma única conta, inclusive em execuções concorrentes.
 - registration_no ausente/nulo é permitido; unicidade somente para strings.
 - guardians.email não é único; vínculos não têm limite artificial de três.
 - class_id de ausências legadas pode ser desconhecido. class_snapshot_source permite
@@ -45,6 +63,6 @@ O workflow inclui lint e teste com MongoDB 7 standalone: documentos válidos por
 rejeição de inválidos, updates inválidos, índices únicos, normalização de e-mail,
 matrículas nulas, responsáveis com e-mail compartilhado, bootstrap repetido sem perda de dados
 e recusa de dados incompatíveis preexistentes.
-A execução e seu resultado devem ser conferidos no SHA candidato.
-Esta entrega não encerra a etapa 2: seed administrativo seguro e health check da aplicação
-continuam pendentes, assim como os gates de paridade e migração.
+A execução e seu resultado devem ser conferidos no SHA candidato. Esta subetapa prepara o seed
+administrativo e o health check CLI. A etapa 2 só será encerrada após o CI executar os novos testes;
+ainda restam os gates de runtime, paridade e migração.

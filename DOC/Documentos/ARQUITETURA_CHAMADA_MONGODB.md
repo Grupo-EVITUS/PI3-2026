@@ -16,7 +16,7 @@ A mudança deve substituir o runtime de persistência de forma coerente. Não ad
 Concluídos no planejamento: comparar branches/PRs, atualizar a issue, criar `feat/saa-mongodb-complete-attendance` a partir da main e registrar riscos de incompatibilidade. A main não é alterada.
 
 ### 2. Base MongoDB
-Portar dependências, configuração, cliente/conexão, inicialização, validators, índices, seed e health check. Fixar versão/topologia Mongo e preparar CI compatível. Gate: bootstrap idempotente, conexão e testes de schema.
+Portar dependências, configuração, cliente/conexão, inicialização, validators, índices, seed inicial seguro e health check interno. Fixar versão/topologia Mongo e preparar CI compatível. Gate: bootstrap idempotente, conexão e testes de schema/seed/health check.
 
 ### 3. Port do runtime e paridade
 Portar autenticação/permissões, cadastros, ocorrências/justificativas, notificações/fila, scripts, telas e testes. Sem SQLite+Mongo simultâneos. Gate: fluxos atuais equivalentes, lint, unit, integração Mongo, aceitação HTTP e CI.

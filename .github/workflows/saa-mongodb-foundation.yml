@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/saa-mongodb-complete-attendance
+      - feat/saa-mongodb-bootstrap-health
   pull_request:
     branches:
       - main
@@ -45,7 +46,14 @@ jobs:
       - name: Lint MongoDB schema and bootstrap
         run: |
           php -l src/Database/Schema.php
+          php -l src/Database/InitialAdmin.php
+          php -l src/Database/HealthCheck.php
           php -l bin/init_mongodb.php
+          php -l bin/create_initial_admin_mongodb.php
+          php -l bin/healthcheck_mongodb.php
           php -l tests/Integration/Database/MongoSchemaTest.php
+          php -l tests/Integration/Database/MongoAdminHealthTest.php
       - name: Validate schema, indexes and idempotent bootstrap
         run: php tests/Integration/Database/MongoSchemaTest.php
+      - name: Validate initial administrator and readiness check
+        run: php tests/Integration/Database/MongoAdminHealthTest.php

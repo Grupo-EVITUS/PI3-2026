@@ -58,10 +58,10 @@ final class Services
         try {
             foreach ($students as $student) {
                 $insertAbsence = $pdo->prepare(
-                    "INSERT INTO absences (student_id, absence_date, status, registered_by, created_at) "
-                    . "VALUES (?, ?, 'PENDENTE', ?, ?)"
+                    "INSERT INTO absences (student_id, class_id, absence_date, status, registered_by, created_at) "
+                    . "VALUES (?, ?, ?, 'PENDENTE', ?, ?)"
                 );
-                $insertAbsence->execute([(int)$student['id'], $absenceDate, $userId, Database::now()]);
+                $insertAbsence->execute([(int)$student['id'], $classId, $absenceDate, $userId, Database::now()]);
                 $absenceId = (int)$pdo->lastInsertId();
                 $absenceRows[] = ['id' => $absenceId, 'student_name' => $student['name']];
                 audit($pdo, $userId, 'AUSENCIA_REGISTRADA', 'ausencia', $absenceId, 'Data ' . $absenceDate);
@@ -135,7 +135,7 @@ final class Services
             . 'a.absence_date, s.name AS student_name, cl.name AS class_name '
             . 'FROM communications c JOIN guardians g ON g.id = c.guardian_id '
             . 'JOIN absences a ON a.id = c.absence_id '
-            . 'JOIN students s ON s.id = a.student_id JOIN classes cl ON cl.id = s.class_id '
+            . 'JOIN students s ON s.id = a.student_id JOIN classes cl ON cl.id = a.class_id '
             . 'WHERE c.id = ?'
         );
         $query->execute([$communicationId]);
@@ -193,7 +193,7 @@ final class Services
             . 'a.absence_date, a.status AS absence_status, s.name AS student_name, '
             . 'cl.name AS class_name, g.name AS guardian_name, j.reason, j.explanation, j.submitted_at '
             . 'FROM communications c JOIN absences a ON a.id = c.absence_id '
-            . 'JOIN students s ON s.id = a.student_id JOIN classes cl ON cl.id = s.class_id '
+            . 'JOIN students s ON s.id = a.student_id JOIN classes cl ON cl.id = a.class_id '
             . 'JOIN guardians g ON g.id = c.guardian_id '
             . 'LEFT JOIN justifications j ON j.absence_id = a.id '
             . 'WHERE c.token_hash = ?'

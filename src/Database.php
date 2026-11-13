@@ -21,11 +21,39 @@ final class Database
 
     public static function migrate(PDO $pdo): void
     {
-        $sql = file_get_contents(__DIR__ . '/../migrations/001_initial.sql');
-        if ($sql === false) {
-            throw new RuntimeException('Não foi possível ler a migração inicial.');
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS schema_migrations ('
+            . 'version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)'
+        );
+        $files = glob(__DIR__ . '/../migrations/*.sql') ?: [];
+        sort($files, SORT_STRING);
+
+        foreach ($files as $file) {
+            $version = basename($file);
+            $applied = $pdo->prepare('SELECT 1 FROM schema_migrations WHERE version = ?');
+            $applied->execute([$version]);
+            if ($applied->fetchColumn()) {
+                continue;
+            }
+
+            $sql = file_get_contents($file);
+            if ($sql === false) {
+                throw new RuntimeException('Não foi possível ler a migração ' . $version . '.');
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $pdo->exec($sql);
+                $record = $pdo->prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)');
+                $record->execute([$version, self::now()]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $error;
+            }
         }
-        $pdo->exec($sql);
     }
 
     public static function seed(PDO $pdo): void

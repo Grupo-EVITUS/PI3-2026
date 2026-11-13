@@ -31,7 +31,8 @@ final class Schema
             Collections::USERS => $schema(
                 ['name', 'email', 'password_hash', 'profile', 'active', 'created_at'],
                 ['name' => $text, 'email' => $text, 'password_hash' => $text,
-                 'profile' => $enum(['AOE', 'COORDENACAO', 'DIRETOR']), 'active' => $active, 'created_at' => $date]
+                 'profile' => $enum(['AOE', 'COORDENACAO', 'DIRETOR']), 'active' => $active,
+                 'created_at' => $date, 'is_initial_admin' => ['bsonType' => 'bool']]
             ),
             Collections::CLASSES => $schema(
                 ['name', 'grade', 'academic_year', 'shift', 'active', 'created_at'],
@@ -88,7 +89,11 @@ final class Schema
     {
         return [
             // ASCII NOCASE do SQLite é preservado por email_key, calculado pelo runtime/importador.
-            Collections::USERS => [['key' => ['email_key' => 1], 'name' => 'users_email_key_unique', 'unique' => true]],
+            Collections::USERS => [
+                ['key' => ['email_key' => 1], 'name' => 'users_email_key_unique', 'unique' => true],
+                ['key' => ['is_initial_admin' => 1], 'name' => 'users_initial_admin_unique', 'unique' => true,
+                 'partialFilterExpression' => ['is_initial_admin' => true]],
+            ],
             Collections::STUDENTS => [
                 ['key' => ['registration_no' => 1], 'name' => 'students_registration_unique', 'unique' => true,
                  'partialFilterExpression' => ['registration_no' => ['$type' => 'string']]],
@@ -140,9 +145,9 @@ final class Schema
             'input' => ['$range' => [0, 26]],
             'initialValue' => $safeEmail,
             'in' => ['$replaceAll' => [
-                'input' => '$value',
-                'find' => ['$substrBytes' => ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', '$this', 1]],
-                'replacement' => ['$substrBytes' => ['abcdefghijklmnopqrstuvwxyz', '$this', 1]],
+                'input' => '$$value',
+                'find' => ['$substrBytes' => ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', '$$this', 1]],
+                'replacement' => ['$substrBytes' => ['abcdefghijklmnopqrstuvwxyz', '$$this', 1]],
             ]],
         ]];
         return ['$and' => [

@@ -7,6 +7,7 @@ use InvalidArgumentException;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
+use MongoDB\Driver\Session;
 use RuntimeException;
 
 /** Gravador append-only para logs Mongo; não substitui a auditoria PDO do runtime atual. */
@@ -26,7 +27,8 @@ final class MongoOperationLogWriter
         string $action,
         string $entity,
         ObjectId|string|null $entityId,
-        string $details = ''
+        string $details = '',
+        ?Session $session = null
     ): ObjectId {
         self::validateLabel($action, self::MAX_ACTION_BYTES, 'ação');
         self::validateLabel($entity, self::MAX_ENTITY_BYTES, 'entidade');
@@ -46,14 +48,16 @@ final class MongoOperationLogWriter
             throw new InvalidArgumentException('Identificador de entidade inválido.');
         }
 
-        $result = $this->logs->insertOne([
+        $document = [
             'user_id' => $userId,
             'action' => $action,
             'entity' => $entity,
             'entity_id' => $normalizedEntityId,
             'details' => $details,
             'happened_at' => new UTCDateTime(),
-        ]);
+        ];
+        $options = $session === null ? [] : ['session' => $session];
+        $result = $this->logs->insertOne($document, $options);
 
         $id = $result->getInsertedId();
         if (!$id instanceof ObjectId) {

@@ -7,6 +7,7 @@ on:
       - feat/saa-mongodb-bootstrap-health
       - feat/saa-mongodb-auth
       - feat/saa-mongodb-user-audit
+      - feat/saa-mongodb-replica-set
   pull_request:
     branches:
       - main
@@ -14,18 +15,8 @@ on:
 jobs:
   mongodb-foundation:
     runs-on: ubuntu-latest
-    services:
-      mongodb:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 12
     env:
-      MONGODB_URI: mongodb://127.0.0.1:27017
+      MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
       MONGODB_DB: saa_ci
       MONGODB_TIMEOUT_MS: 5000
     steps:
@@ -37,6 +28,20 @@ jobs:
           extensions: mongodb-2.5.0, mbstring
           tools: composer:v2
           coverage: none
+      - name: Start MongoDB 7 replica set
+        run: |
+          docker run -d --name saa-mongodb -p 127.0.0.1:27017:27017 mongo:7.0 mongod --replSet rs0 --bind_ip_all
+          for attempt in $(seq 1 30); do
+            if [ "$(docker exec saa-mongodb mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok')" = "1" ]; then break; fi
+            sleep 1
+          done
+          if [ "$(docker exec saa-mongodb mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok')" != "1" ]; then exit 1; fi
+          docker exec saa-mongodb mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+          for attempt in $(seq 1 30); do
+            if [ "$(docker exec saa-mongodb mongosh --quiet --eval 'db.adminCommand({ hello: 1 }).isWritablePrimary')" = "true" ]; then exit 0; fi
+            sleep 1
+          done
+          exit 1
       - name: Validate Composer metadata
         run: composer validate --no-check-publish
       - name: Install locked dependencies
@@ -52,6 +57,7 @@ jobs:
           php -l src/Database/HealthCheck.php
           php -l src/Database/MongoUserAuthenticator.php
           php -l src/Database/MongoOperationLogWriter.php
+          php -l tests/Integration/Database/MongoTransactionTest.php
           php -l bin/init_mongodb.php
           php -l bin/create_initial_admin_mongodb.php
           php -l bin/healthcheck_mongodb.php
@@ -67,3 +73,8 @@ jobs:
         run: php tests/Integration/Database/MongoUserAuthenticatorTest.php
       - name: Validate append-only MongoDB audit logging
         run: php tests/Integration/Database/MongoOperationLogWriterTest.php
+      - name: Validate transaction commit and rollback
+        run: php tests/Integration/Database/MongoTransactionTest.php
+      - name: Stop MongoDB replica set
+        if: always()
+        run: docker rm -f saa-mongodb || true

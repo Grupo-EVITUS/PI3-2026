@@ -6,6 +6,7 @@ on:
       - feat/saa-mongodb-complete-attendance
       - feat/saa-mongodb-bootstrap-health
       - feat/saa-mongodb-auth
+      - feat/saa-mongodb-user-audit
   pull_request:
     branches:
       - main
@@ -50,15 +51,19 @@ jobs:
           php -l src/Database/InitialAdmin.php
           php -l src/Database/HealthCheck.php
           php -l src/Database/MongoUserAuthenticator.php
+          php -l src/Database/MongoOperationLogWriter.php
           php -l bin/init_mongodb.php
           php -l bin/create_initial_admin_mongodb.php
           php -l bin/healthcheck_mongodb.php
           php -l tests/Integration/Database/MongoSchemaTest.php
           php -l tests/Integration/Database/MongoAdminHealthTest.php
           php -l tests/Integration/Database/MongoUserAuthenticatorTest.php
+          php -l tests/Integration/Database/MongoOperationLogWriterTest.php
       - name: Validate schema, indexes and idempotent bootstrap
         run: php tests/Integration/Database/MongoSchemaTest.php
       - name: Validate initial administrator and readiness check
         run: php tests/Integration/Database/MongoAdminHealthTest.php
       - name: Validate isolated MongoDB authentication
         run: php tests/Integration/Database/MongoUserAuthenticatorTest.php
+      - name: Validate append-only MongoDB audit logging
+        run: php tests/Integration/Database/MongoOperationLogWriterTest.php

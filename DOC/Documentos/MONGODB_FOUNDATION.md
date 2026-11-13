@@ -79,21 +79,37 @@ dedicados para hash, token ou corpo de mensagem. Chamadores devem manter esses v
 `details` e gravar somente contexto operacional redigido.
 
 O gravador não substitui `Helpers::audit(PDO)` nem está conectado às rotas. A escrita de um
-usuário e seu evento ainda não é atômica nesta fatia. O CRUD de usuários junto com auditoria
-deve aguardar suporte a transações e testes numa topologia replica set; a CI atual usa MongoDB
-standalone. A migração de sessão/rotas também espera que todos os serviços consumidores usem
-ObjectId e MongoDB, sem mistura com PDO/IDs inteiros.
+usuário e seu evento ainda não é atômica nesta fatia. Quando 3.2a foi concluída, o CRUD de
+usuários junto com auditoria aguardava transações testadas em replica set. A subetapa 3.2b
+prepara agora essa topologia e o teste; só após o CI passar será possível considerar esse gate
+técnico validado. A migração de sessão/rotas também espera que todos os serviços consumidores
+usem ObjectId e MongoDB, sem mistura com PDO/IDs inteiros.
 O contrato append-only limita a API do componente, não as permissões do usuário MongoDB. Antes
 da integração de runtime, restringir as permissões sobre `operation_logs` para impedir update e
 delete; validar também que cada chamador não inclua e-mail, token, hash ou conteúdo de mensagem
 em `details`.
 
+## Etapa 3.2b — base transacional
+A composição local e a CI sobem MongoDB 7 como replica set de um nó (`rs0`) e conectam com
+`replicaSet=rs0`. `MongoTransactionTest` grava usuário e evento em duas coleções, valida o
+rollback conjunto e depois confirma a gravação conjunta. Esta etapa prepara a primitiva para
+um CRUD futuro; o gravador aceita uma sessão opcional para participar da transação. A fatia
+testa o escritor e a coleção de usuários na mesma sessão, mas ainda não cria usuários pelo
+runtime nem ativa transações nas rotas da aplicação.
+Um replica set de um nó valida o contrato de transação; não representa alta disponibilidade.
+A configuração Compose é somente para desenvolvimento/CI, sem autenticação MongoDB e com a
+porta publicada apenas em loopback; não expor nem reutilizar em produção. O membro anuncia
+`127.0.0.1`, adequado para o PHP executado no host; clientes em containers precisarão de um
+hostname de rede apropriado na configuração de implantação.
+Para subir localmente e aguardar o primário ficar pronto antes dos testes, execute
+`docker compose -f docker-compose.saa-mongodb.yml up -d --wait`.
+
 ## Evidências e limites
-O workflow inclui lint e teste com MongoDB 7 standalone: documentos válidos por coleção,
+O workflow inclui lint e teste com MongoDB 7: documentos válidos por coleção,
 rejeição de inválidos, updates inválidos, índices únicos, normalização de e-mail,
 matrículas nulas, responsáveis com e-mail compartilhado, bootstrap repetido sem perda de dados
 e recusa de dados incompatíveis preexistentes.
 A fundação da etapa 2 (incluindo seed e health check CLI) passou no CI MongoDB 7, run #5. A etapa
-3.1 de autenticação isolada passou no run #7. Esta etapa 3.2a acrescenta o teste append-only;
-seu resultado precisa ser conferido no SHA candidato. Ainda restam os gates de runtime, paridade
-e migração.
+3.1 de autenticação isolada passou no run #9 e a etapa 3.2a append-only no run #13. A etapa 3.2b
+acrescenta o teste transacional; seu resultado precisa ser conferido no SHA candidato. Ainda
+restam os gates de runtime, autorização, paridade, migração e configuração de permissões.

@@ -76,7 +76,7 @@ try {
         }
     }
     auditCheck($dateIndex !== null, 'Índice de consulta por data deve existir.');
-    auditCheck(!isset($dateIndex->getOptions()['expireAfterSeconds']),
+    auditCheck(!isset($dateIndex['expireAfterSeconds']),
         'Logs de auditoria não devem expirar automaticamente.');
     auditCheck(!method_exists($writer, 'update') && !method_exists($writer, 'delete'),
         'O gravador deve expor somente inclusão, sem edição ou exclusão.');
@@ -85,3 +85,4 @@ try {
 } finally {
     $database->drop();
 }
+4f3cc77db00e52bd094a706331f8471d9c2a4662

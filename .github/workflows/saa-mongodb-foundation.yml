@@ -1,0 +1,44 @@
+name: SAA MongoDB foundation
+
+on:
+  push:
+    branches:
+      - feat/saa-mongodb-complete-attendance
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  mongodb-foundation:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      MONGODB_DB: saa_ci
+      MONGODB_TIMEOUT_MS: 5000
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP and MongoDB extension
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mongodb-2.5.0, mbstring
+          tools: composer:v2
+          coverage: none
+      - name: Validate Composer metadata
+        run: composer validate --no-check-publish
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist
+      - name: Run BSON checks
+        run: composer test:bson
+      - name: Check real MongoDB connection and round trip
+        run: php tests/Integration/Database/MongoSmokeTest.php

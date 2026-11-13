@@ -1,6 +1,6 @@
 # Requisitos não funcionais — SAA
 
-**Origem:** issue #10 e `Sprint/sprints/S2/SPRINT_2.md` (RNF-01 a RNF-15), revisados para PHP + MongoDB, e acrescidos
+**Origem:** issue #10 e `DOC/Documentos/Sprint/sprints/S2/SPRINT_2.md` (RNF-01 a RNF-15), revisados para PHP + MongoDB, e acrescidos
 dos requisitos que a arquitetura adotou (RNF-16 em diante). **Status:** situação durante a Etapa 2.
 
 Legenda: ✅ verificado por teste automatizado · 🔎 verificado por inspeção/documento · ⏳ pendente (etapa indicada).

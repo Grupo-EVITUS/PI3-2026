@@ -42,7 +42,7 @@ tests/                  Unit/ Integration/ Acceptance/ Support/
 views/                  templates PHP: layouts/, partials/, errors/, auth/, home/, ...
 var/                    dados de execução (logs, e-mails em arquivo) — ignorado pelo Git
 router.php              script do servidor embutido do PHP (php -S ... router.php)
-Sprint/                 documentação das Sprints da equipe (não alterar sem alinhamento)
+DOC/                    documentos da equipe: Sprints, diagramas e modelagem (não alterar sem alinhamento)
 ```
 
 Namespaces seguem PSR-4: `Saa\` → `src/`; `Saa\Tests\` → `tests/`. **Nome do arquivo = nome da classe, respeitando

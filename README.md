@@ -13,13 +13,16 @@ O sistema está sendo entregue por etapas, uma por *milestone* do GitHub
 | Etapa | Milestone | Conteúdo | Situação |
 |:-:|---|---|---|
 | 1 | Sprint 4 – Arquitetura e Protótipos | arquitetura, modelagem MongoDB, design system, login e tela inicial | ✅ concluída |
-| 2 | Sprint 5 – MVP Funcional | cadastros (alunos, responsáveis, turmas, usuários), vínculos, API, e-mail, dados fictícios, Docker | em andamento |
-| 3 | Sprint 6 – Desenvolvimento Completo | registro de ausências, envio automático, justificativa, ocorrências, dashboard, perfis, recuperação de senha | planejada |
+| 2 | Sprint 5 – MVP Funcional | cadastros (alunos, responsáveis, turmas, usuários), vínculos, API, e-mail, dados fictícios, Docker | ✅ concluída |
+| 3 | Sprint 6 – Desenvolvimento Completo | registro de ausências, envio automático, justificativa, ocorrências, dashboard, perfis, recuperação de senha | próxima |
 | 4 | Sprint 7 – Homologação | testes funcionais, correções, homologação | planejada |
 | 5 | Entrega Final PI3 | documentação final e apresentação | planejada |
 
-O que já funciona hoje: login (com limite de tentativas), tela inicial, "meu perfil", matriz de perfis e permissões e
-a criação do banco (12 coleções com validação e índices).
+O que já funciona hoje: login (com limite de tentativas); tela inicial com os números da escola; cadastros de períodos
+letivos, turmas, alunos e responsáveis, com os vínculos entre eles; cadastro e busca de usuários (Administrador);
+matriz de perfis e permissões; API JSON; envio de e-mails de ausência (fila, novas tentativas e webhook) e execução
+com Docker. **Ainda não há tela** para registrar ausências, justificar pelo link, consultar ocorrências nem o
+dashboard — isso é a Etapa 3 (hoje o registro de falta existe só pela API, `POST /api/attendance`).
 
 ## Requisitos
 
@@ -49,8 +52,8 @@ Qualquer uma das opções:
 
 - **Instalado no Windows:** MongoDB Community Server (<https://www.mongodb.com/try/download/community>), que roda como
   serviço em `mongodb://127.0.0.1:27017`.
-- **Docker:** `docker run -d --name saa-mongo -p 27017:27017 -v saa-mongo:/data/db mongo:7` (o `docker compose` completo
-  do projeto chega na Etapa 2).
+- **Docker:** `docker run -d --name saa-mongo -p 27017:27017 -v saa-mongo:/data/db mongo:7` (só o banco), ou o
+  `docker compose` do projeto, que sobe tudo (veja "Com Docker" abaixo).
 - **MongoDB Atlas** (gratuito): use a *connection string* `mongodb+srv://...` em `MONGODB_URI`.
 
 ## Como executar
@@ -67,6 +70,24 @@ php bin/init_db.php           # cria coleções, validators e índices (pode rod
 php bin/create_user.php --name "Administrador" --email admin@escola.local --profile ADMIN
 composer serve                # http://127.0.0.1:8000
 ```
+
+Para experimentar com uma escola fictícia pronta (usuários de cada perfil, 3 turmas, alunos, responsáveis e dois meses
+de frequência), rode `php bin/seed.php`. Ele cria `admin@`, `coordenacao@`, `aoe@` e `secretaria@escola.test` com a
+senha da variável `SEED_PASSWORD` (sem ela, gera e mostra uma senha por usuário); pode rodar de novo sem duplicar,
+`--reset` apaga só os dados de demonstração e ele se recusa a rodar com `APP_ENV=production`.
+
+### Com Docker
+
+```bash
+docker compose up -d --build                    # http://localhost:8080
+SEED_DEMO=true SEED_PASSWORD="UmaSenhaForte!2026" docker compose up -d --build   # já com os dados fictícios
+docker compose exec app php bin/create_user.php --name "Administrador" --email admin@escola.local --profile ADMIN
+docker compose down                             # para; os dados ficam no volume (down -v apaga)
+```
+
+Sobem três serviços: MongoDB, a aplicação e a fila de e-mails. Por padrão os e-mails viram arquivos `.eml` em
+`var/mail` dentro do container (`MAIL_MODE=file`); para enviar de verdade, configure `MAIL_MODE=smtp` e as variáveis
+`SMTP_*` (veja `.env.example`).
 
 O `create_user.php` usa a senha da variável `INITIAL_USER_PASSWORD`; sem ela, gera uma senha forte e mostra **uma
 única vez**. Perfis: `ADMIN`, `COORDINATION`, `AOE`, `SECRETARY`.
@@ -97,14 +118,14 @@ a cada push com PHP 8.3, 8.4 e 8.5 e MongoDB 7 ([.github/workflows/ci.yml](.gith
 ## Estrutura
 
 ```text
-bin/        init_db.php, create_user.php (linha de comando)
+bin/        init_db.php, seed.php, create_user.php, process_mail_queue.php (linha de comando)
 config/     rotas (config/routes/*.php) e menu (navigation.php)
 docs/       arquitetura, modelagem, design system, diagramas, requisitos e relatórios de etapa
 public/     index.php (ponto de entrada) e assets (CSS, JS, ícones)
 src/        Core (mini-framework), Controllers, Services, Models, Database, Domain, Security, Support
 tests/      Unit, Integration, Acceptance
 views/      templates PHP (layouts, parciais e telas)
-Sprint/     documentos de Sprint da equipe
+DOC/        documentos da equipe (Sprints, diagramas, modelagem)
 ```
 
 ## Documentação

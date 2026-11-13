@@ -10,8 +10,7 @@ var
 .env.*
 !.env.example
 tests
-Sprint
-Diagramas
+DOC
 *.zip
 *.pdf
 *.docx

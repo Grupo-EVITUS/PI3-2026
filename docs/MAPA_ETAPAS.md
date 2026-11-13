@@ -4,23 +4,18 @@ O desenvolvimento em PHP + MongoDB é entregue **por etapas**, cada uma correspo
 projeto. Cada etapa termina com código testado, documentação atualizada e commit(s) próprios na branch
 `feat/php-mongodb`.
 
-## Por que seguir os milestones do GitHub
+## Etapas e Sprints
 
-O repositório tem duas numerações de Sprint:
+As entregas seguem os **milestones e issues do GitHub** (`Sprint 4 – Arquitetura e Protótipos` … `Sprint 7 – Homologação`
+e `Entrega Final PI3`), que trazem os critérios de aceite de cada issue. Os documentos de Sprint da equipe ficam em
+[`DOC/Documentos/Sprint/`](../DOC/Documentos/Sprint/) (S1 a S6) e usam os mesmos números de issue; a numeração das
+Sprints é diferente da dos milestones, e a tabela abaixo mostra a correspondência aproximada.
 
-- os **milestones e issues do GitHub** (`Sprint 4 – Arquitetura e Protótipos` … `Sprint 7 – Homologação` e
-  `Entrega Final PI3`), com critérios de aceite em cada issue;
-- os documentos em [`Sprint/`](../Sprint/) (S1 a S6), escritos na fase Flask.
-
-Os números de issue citados em `Sprint/sprints/S3` a `S6` **não batem** com os do GitHub (ex.: lá "#41 Dashboard
-Gerencial"; no GitHub o Dashboard Gerencial é a **#46** e a #41 é "Relacionamento Aluno-Turma-Responsável"). Por isso
-o GitHub é a fonte de verdade das entregas; a tabela abaixo mostra a correspondência aproximada com os documentos.
-
-| Etapa | Milestone do GitHub (prazo) | Equivale nos docs `Sprint/` | Situação |
+| Etapa | Milestone do GitHub (prazo) | Equivale nos docs de Sprint | Situação |
 |:-:|---|---|---|
 | 1 | Sprint 4 – Arquitetura e Protótipos (18/10/2026) | S2 — especificação técnica e prototipação | ✅ concluída |
-| 2 | Sprint 5 – MVP Funcional (08/11/2026) | S3 — implementação e validação da base | próxima |
-| 3 | Sprint 6 – Desenvolvimento Completo (15/11/2026) | S4 — funcionalidades gerenciais e perfis | planejada |
+| 2 | Sprint 5 – MVP Funcional (08/11/2026) | S3 — implementação e validação da base | ✅ concluída |
+| 3 | Sprint 6 – Desenvolvimento Completo (15/11/2026) | S4 — funcionalidades gerenciais e perfis | próxima |
 | 4 | Sprint 7 – Homologação | S5 — integração e homologação | planejada |
 | 5 | Entrega Final PI3 (28/11/2026) | S6 — finalização e entrega | planejada |
 
@@ -52,6 +47,8 @@ Relatório: [etapas/ETAPA_1_SPRINT_4.md](etapas/ETAPA_1_SPRINT_4.md).
 | #41 Relacionamento Aluno-Turma-Responsável | vínculos aluno–turma e aluno–responsável, consulta dos vínculos |
 
 Também: dados fictícios (seed), API JSON dos cadastros, webhook de e-mail e execução com Docker Compose.
+
+Relatório: [etapas/ETAPA_2_SPRINT_5.md](etapas/ETAPA_2_SPRINT_5.md).
 
 ## Etapa 3 — Sprint 6: Desenvolvimento Completo
 

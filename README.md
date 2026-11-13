@@ -7,7 +7,9 @@ MVP web em **PHP, HTML e CSS** para registrar ausências escolares, comunicar os
 - PHP 8.1 ou superior
 - Extensões PHP `PDO` e `pdo_sqlite`
 
-O MVP não depende de Composer, Node.js nem de um serviço de banco externo. O SQLite é criado automaticamente em `var/saa.sqlite3`, e a migração inicial está em `migrations/001_initial.sql`.
+O MVP não depende de Composer, Node.js nem de um serviço de banco externo. O SQLite é criado automaticamente em `var/saa.sqlite3`; as migrações numeradas em `migrations/` são aplicadas e registradas em `schema_migrations` na inicialização.
+
+`002_absence_class_snapshot.sql` preserva a turma associada a novas ausências, mesmo após a transferência do aluno. Em bancos existentes, a migração preenche registros antigos com a turma atual do aluno; transferências anteriores não podem ser recuperadas sem histórico de origem.
 
 ## Executar localmente
 
@@ -99,7 +101,7 @@ Os testes cobrem lote de ausências, bloqueio de duplicidade sem inserção parc
 
 - `public/index.php`: rotas HTTP e controles de perfil.
 - `src/Services.php`: validações e regras de negócio.
-- `src/Database.php` e `migrations/`: persistência, seed e esquema.
+- `src/Database.php` e `migrations/`: persistência, seed, aplicação rastreada de migrações e esquema.
 - `src/MailQueue.php` e `bin/process_mail_queue.php`: outbox persistente e worker de envio.
 - `templates/` e `public/assets/app.css`: interface HTML/CSS responsiva.
 

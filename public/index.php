@@ -35,6 +35,10 @@ function notFound(): never
 }
 
 try {
+    if ($mongoStaffWeb) {
+        require dirname(__DIR__) . '/src/mongo_staff_web.php';
+        exit;
+    }
     if ($path === '/' || $path === '/index.php') {
         Auth::redirect(empty($_SESSION['user_id']) ? '/login' : '/ocorrencias');
     }

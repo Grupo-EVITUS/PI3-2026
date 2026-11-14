@@ -69,6 +69,33 @@ try {
     transactionCheck($database->operation_logs->findOne(['_id' => $commitLogId]) !== null,
         'Confirmar a transação deve persistir o evento correspondente.');
 
+    $registration = new Saa\Database\MongoStaffRegistration($database);
+    $staff = $registration->register($commitUserId, 'Funcionária', 'staff@example.org', 'Senha-de-teste-2026', 'AOE');
+    transactionCheck($database->users->countDocuments(['_id' => $staff]) === 1
+        && $database->operation_logs->countDocuments(['user_id' => $commitUserId, 'entity_id' => (string)$staff]) === 1,
+        'Cadastro autorizado deve persistir funcionário e auditoria.');
+
+    try {
+        $registration->register($staff, 'Sem acesso', 'denied@example.org', 'Senha-de-teste-2026', 'AOE');
+        throw new LogicException('Cadastro com perfil AOE deveria falhar.');
+    } catch (RuntimeException $error) {
+        transactionCheck($error->getMessage() === 'Cadastro permitido somente à coordenação ativa.',
+            'A operação deveria falhar por autorização.');
+    }
+
+    // O validador temporário rejeita somente a inserção na coleção de auditoria.
+    $database->command(['collMod' => 'operation_logs', 'validator' => ['action' => 'EVENTO_DE_TESTE']])->toArray();
+    $before = $database->operation_logs->countDocuments();
+    try {
+        $registration->register($commitUserId, 'Falha controlada', 'failed@example.org', 'Senha-de-teste-2026', 'AOE');
+        throw new LogicException('O banco deveria rejeitar o evento.');
+    } catch (MongoDB\Driver\Exception\BulkWriteException $error) {
+        transactionCheck($error->getCode() === 121, 'Esperada rejeição do validador da auditoria.');
+    }
+    transactionCheck($database->users->countDocuments(['email' => 'failed@example.org']) === 0
+        && $database->operation_logs->countDocuments() === $before,
+        'Falha da auditoria deve desfazer todo o cadastro.');
+
     fwrite(STDOUT, "MongoTransactionTest: commit e rollback multi-coleção passaram.\n");
 } finally {
     try {

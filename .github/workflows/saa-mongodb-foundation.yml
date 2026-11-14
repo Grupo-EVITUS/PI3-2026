@@ -75,6 +75,21 @@ jobs:
         run: php tests/Integration/Database/MongoOperationLogWriterTest.php
       - name: Validate transaction commit and rollback
         run: php tests/Integration/Database/MongoTransactionTest.php
+      - name: Validate login and staff registration over HTTP
+        env:
+          SAA_WEB_MODE: mongo_staff
+          MONGODB_DB: saa_web_ci
+          INITIAL_ADMIN_NAME: Coordenação
+          INITIAL_ADMIN_EMAIL: coord@example.org
+          INITIAL_ADMIN_PASSWORD: CI-temporaria-2026
+        run: |
+          php bin/init_mongodb.php
+          php bin/create_initial_admin_mongodb.php
+          php -S 127.0.0.1:8765 router.php > /tmp/saa-web-ci.log 2>&1 &
+          trap 'kill $!' EXIT
+          curl --retry 8 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8765/login > /dev/null
+          python3 tests/Integration/staff_web.py
+          php -r 'require "vendor/autoload.php"; $db=Saa\Database\Mongo::database(); $u=$db->users->findOne(["email"=>"aoe@example.org"]); $a=$db->users->findOne(["email"=>"coord@example.org"]); exit($u && $a && $db->operation_logs->countDocuments(["action"=>"USUARIO_CRIADO","user_id"=>$a["_id"],"entity_id"=>(string)$u["_id"]])===1 && !$db->users->findOne(["email"=>"denied@example.org"]) ? 0 : 1);'
       - name: Stop MongoDB replica set
         if: always()
         run: docker rm -f saa-mongodb || true

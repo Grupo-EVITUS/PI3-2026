@@ -9,12 +9,19 @@ session_set_cookie_params([
     'samesite' => 'Lax',
     'path' => '/',
 ]);
+$mongoStaffWeb = getenv('SAA_WEB_MODE') === 'mongo_staff';
+session_name($mongoStaffWeb ? 'SAA_MONGO_STAFF' : session_name());
 session_start();
 
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Services.php';
+
+if ($mongoStaffWeb) {
+    require dirname(__DIR__) . '/vendor/autoload.php';
+    return;
+}
 
 $pdo = Database::connect();
 Database::migrate($pdo);

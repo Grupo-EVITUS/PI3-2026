@@ -14,15 +14,17 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="<?= isset($_SESSION['user_id']) ? '/ocorrencias' : '/login' ?>">
+    <a class="brand" href="<?= isset($_SESSION['user_id']) ? (getenv('SAA_WEB_MODE') === 'mongo_staff' ? '/cadastros' : '/ocorrencias') : '/login' ?>">
         <span class="brand-mark" aria-hidden="true">P</span>
         <span><strong>Presença</strong><small>Comunicação escolar</small></span>
     </a>
     <?php if (!empty($_SESSION['user_id'])): ?>
         <nav class="main-nav" aria-label="Navegação principal">
+            <?php if (getenv('SAA_WEB_MODE') !== 'mongo_staff'): ?>
             <a href="/ocorrencias">Ocorrências</a>
             <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
                 <a href="/ausencias/registrar">Registrar ausência</a>
+            <?php endif; ?>
             <?php endif; ?>
             <?php if (($_SESSION['profile'] ?? '') === 'COORDENACAO'): ?>
                 <a href="/cadastros">Cadastros</a>

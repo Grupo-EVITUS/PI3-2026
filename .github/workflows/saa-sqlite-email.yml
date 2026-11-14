@@ -1,0 +1,35 @@
+name: SAA SQLite email e justificativa
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  email:
+    runs-on: ubuntu-latest
+    services:
+      mailpit:
+        image: axllent/mailpit:v1.21.8
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      MAIL_MODE: smtp
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: '1025'
+      SMTP_ENCRYPTION: none
+      PUBLIC_BASE_URL: http://127.0.0.1:8765
+      DATABASE_PATH: /tmp/saa-email-ci.sqlite3
+      SEED_DEMO: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, mbstring
+      - name: Registrar ausência, receber e-mail e justificar por HTTP
+        run: |
+          php -S 127.0.0.1:8765 router.php >/tmp/saa-web.log 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          curl --retry 10 --retry-connrefused --retry-delay 1 -fsS "$PUBLIC_BASE_URL/login" >/dev/null
+          curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8025/api/v1/messages >/dev/null
+          python3 tests/Integration/absence_email.py

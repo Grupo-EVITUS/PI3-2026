@@ -4,6 +4,12 @@
 **Branch de trabalho:** `feat/saa-mongodb-complete-attendance`  
 **Issue:** #46
 
+**Contrato de persistência:** `attendance_sessions` já possui validação de BSON,
+índice único por `class_id`/`attendance_date` e índice de consulta por data/status.
+`absences.attendance_session_id` é opcional para preservar ocorrências legadas.
+Isso prepara a gravação da chamada; o runtime Mongo ainda não registra sessões,
+justificativas nem envia os e-mails dessa chamada.
+
 ## Diretriz de integração
 
 A aplicação executável na `main` usa PHP e SQLite; a branch `feat/php-mongodb` contém um rewrite PHP + MongoDB divergente e ainda registra ausências individuais. A PR #55 implementa chamada completa em SQLite. Ambas são referências para port seletivo; nenhuma será mesclada integralmente. A implementação trabalha na branch nova baseada na main atual, preservando os commits recentes de histórico, snapshot de turma e integridade.
@@ -34,7 +40,12 @@ Implementar visão da escola, gráfico individual e gráfico por turma com selet
 
 ### `attendance_sessions`
 
-Um documento por turma e data, com:
+Um documento por turma e data. O contrato atual usa `class_id`, `attendance_date`,
+`completed_by`, `completed_at`, snapshots `class_name`/`class_shift`/`academic_year`,
+`entries[]` e `roster_hash`. Os valores de status persistidos são `PRESENTE` e
+`AUSENTE` nas entradas e `PROCESSANDO` ou `CONCLUIDA` na sessão.
+
+A evolução planejada da chamada inclui:
 
 - `class_id`, nome e período da turma no dia;
 - data, usuário responsável e instante de criação;

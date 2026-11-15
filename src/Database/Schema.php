@@ -78,10 +78,22 @@ final class Schema
                     'status' => $enum(['PROCESSANDO', 'CONCLUIDA']),
                 ]
             ),
+            Collections::LEGACY_ATTENDANCE_SESSIONS => $schema(
+                ['legacy_id', 'class_id', 'attendance_date', 'completed_by', 'completed_at'],
+                ['legacy_id' => ['bsonType' => ['int', 'long']], 'class_id' => $id,
+                 'attendance_date' => ['bsonType' => 'string', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
+                 'completed_by' => $id, 'completed_at' => $date]
+            ),
+            Collections::LEGACY_ATTENDANCE_RECORDS => $schema(
+                ['legacy_id', 'session_id', 'student_id', 'status', 'created_at'],
+                ['legacy_id' => ['bsonType' => ['int', 'long']], 'session_id' => $id,
+                 'student_id' => $id, 'status' => $enum(['PRESENTE', 'AUSENTE']), 'created_at' => $date]
+            ),
             Collections::ABSENCES => $schema(
                 ['student_id', 'absence_date', 'status', 'registered_by', 'created_at'],
                 ['student_id' => $id, 'class_id' => $nullableId,
                  'attendance_session_id' => $nullableId,
+                 'legacy_attendance_session_id' => $nullableId,
                  'absence_date' => ['bsonType' => 'string', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
                  'status' => $enum(['PENDENTE', 'RESPONDIDA']), 'registered_by' => $id, 'created_at' => $date,
                  'class_snapshot_source' => $enum(['captured', 'legacy_backfill', 'unknown'])]
@@ -136,6 +148,12 @@ final class Schema
             Collections::ATTENDANCE_SESSIONS => [
                 ['key' => ['class_id' => 1, 'attendance_date' => 1], 'name' => 'attendance_class_day_unique', 'unique' => true],
                 ['key' => ['attendance_date' => -1, 'status' => 1], 'name' => 'attendance_date_status'],
+            ],
+            Collections::LEGACY_ATTENDANCE_SESSIONS => [
+                ['key' => ['legacy_id' => 1], 'name' => 'legacy_session_id_unique', 'unique' => true],
+            ],
+            Collections::LEGACY_ATTENDANCE_RECORDS => [
+                ['key' => ['session_id' => 1, 'student_id' => 1], 'name' => 'legacy_session_student_unique', 'unique' => true],
             ],
             Collections::ABSENCES => [
                 ['key' => ['student_id' => 1, 'absence_date' => 1], 'name' => 'absence_student_day_unique', 'unique' => true],

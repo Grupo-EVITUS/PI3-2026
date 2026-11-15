@@ -73,7 +73,7 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
         $directory = new MongoSchoolDirectory(Mongo::database());
         if ($path === '/cadastros/turma') {
             $year = filter_var($_POST['academic_year'] ?? null, FILTER_VALIDATE_INT);
-            if ($year === false) {
+            if (!is_int($year)) {
                 throw new InvalidArgumentException('Ano inválido.');
             }
             $directory->createClass($actor, $values['name'], $values['grade'], $year, $values['shift']);

@@ -33,6 +33,7 @@ try {
     $guardianId = new ObjectId();
     $userId = new ObjectId();
     $absenceId = new ObjectId();
+    $sessionId = new ObjectId();
     $communicationId = new ObjectId();
     $fixtures = [
         'users' => ['_id' => $userId] + $user,
@@ -42,8 +43,15 @@ try {
         'guardians' => ['_id' => $guardianId, 'name' => 'Responsável', 'email' => 'shared@example.org',
             'relationship' => 'Mãe', 'active' => true, 'created_at' => $now],
         'student_guardians' => ['student_id' => $studentId, 'guardian_id' => $guardianId],
+        'attendance_sessions' => ['_id' => $sessionId, 'class_id' => $classId,
+            'attendance_date' => '2026-11-13', 'completed_by' => $userId, 'completed_at' => $now,
+            'class_name' => 'A', 'class_shift' => 'Manhã', 'academic_year' => 2026, 'status' => 'CONCLUIDA',
+            'roster_hash' => hash('sha256', 'test'),
+            'entries' => [['student_id' => $studentId, 'student_name' => 'Aluno',
+                'registration_no' => null, 'status' => 'AUSENTE']]],
         'absences' => ['_id' => $absenceId, 'student_id' => $studentId, 'absence_date' => '2026-11-13',
             'status' => 'PENDENTE', 'registered_by' => $userId, 'created_at' => $now,
+            'attendance_session_id' => $sessionId,
             'class_snapshot_source' => 'unknown'],
         'communications' => ['_id' => $communicationId, 'absence_id' => $absenceId, 'guardian_id' => $guardianId,
             'email_to' => 'shared@example.org', 'token_hash' => 'hash-test', 'status' => 'PENDENTE', 'created_at' => $now],
@@ -77,8 +85,8 @@ try {
     foreach ($before as $name => $count) {
         check($db->selectCollection($name)->countDocuments() === $count, 'Bootstrap alterou dados.');
     }
-    check(!in_array('attendance_sessions', iterator_to_array($db->listCollectionNames(), false), true),
-        'Chamada futura criada prematuramente.');
+    check(in_array('attendance_sessions', iterator_to_array($db->listCollectionNames(), false), true),
+        'Coleção de chamada completa ausente.');
 
     $duplicate = $user;
     $duplicate['email'] = 'TESTE@example.org';
@@ -119,11 +127,21 @@ try {
     $guardian = $fixtures['guardians'];
     unset($guardian['_id']);
     $db->guardians->insertOne($guardian); // E-mail não é uma identidade única.
-    foreach (['student_guardians', 'absences', 'communications', 'mail_queue', 'justifications'] as $name) {
+    foreach (['student_guardians', 'attendance_sessions', 'absences', 'communications', 'mail_queue', 'justifications'] as $name) {
         $duplicate = $fixtures[$name];
         unset($duplicate['_id']);
         rejected(fn() => $db->selectCollection($name)->insertOne($duplicate), 11000);
     }
+    $invalidSession = $fixtures['attendance_sessions'];
+    unset($invalidSession['_id']);
+    $invalidSession['attendance_date'] = '2026-11-14';
+    $invalidSession['entries'][0]['status'] = 'ATRASADO';
+    rejected(fn() => $db->attendance_sessions->insertOne($invalidSession), 121);
+    // A ausência importada sem sessão continua válida; duplicidade por sessão não a afeta.
+    $legacyAbsence = $fixtures['absences'];
+    unset($legacyAbsence['_id'], $legacyAbsence['attendance_session_id']);
+    $legacyAbsence['absence_date'] = '2026-11-14';
+    $db->absences->insertOne($legacyAbsence);
     rejected(fn() => $db->absences->updateOne(['_id' => $absenceId], ['$set' => ['status' => 'PRESENTE']]), 121);
     check($db->mail_queue->findOne(['communication_id' => $communicationId])['status'] === 'QUARENTENA',
         'Fila deixou de estar em quarentena.');

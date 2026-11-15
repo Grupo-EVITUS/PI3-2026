@@ -7,6 +7,7 @@ use Saa\Database\Mongo;
 use Saa\Database\MongoStaffRegistration;
 use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\MongoAttendance;
+use Saa\Database\MongoJustification;
 use Saa\Database\Bson;
 use Saa\Database\MongoUserAuthenticator;
 
@@ -87,6 +88,45 @@ if ($path === '/logout') {
     $_SESSION = [];
     session_regenerate_id(true);
     Auth::redirect('/login');
+}
+if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+    $token = $matches[1];
+    $service = new MongoJustification(Mongo::database());
+    $absence = $service->find($token);
+    if ($absence === null) {
+        notFound();
+    }
+    $error = null;
+    $selectedReason = '';
+    $explanation = '';
+    if ($method === 'POST') {
+        requirePost();
+        try {
+            $selectedReason = $_POST['reason'] ?? '';
+            $explanation = $_POST['explanation'] ?? '';
+            if (!is_string($selectedReason) || !is_string($explanation)) {
+                throw new InvalidArgumentException('Justificativa inválida.');
+            }
+            $service->submit($token, $selectedReason, $explanation);
+            render('justification_success.php', ['absence' => $absence]);
+            return;
+        } catch (DomainException $caught) {
+            http_response_code(409);
+            $error = $caught->getMessage();
+            $absence = $service->find($token) ?? $absence;
+        } catch (InvalidArgumentException $caught) {
+            http_response_code(422);
+            $error = $caught->getMessage();
+        }
+    }
+    render('justification.php', [
+        'absence' => $absence, 'error' => $error, 'reasons' => Services::REASONS,
+        'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
+        'explanation' => is_string($explanation) ? $explanation : '',
+    ]);
+    return;
 }
 if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
     Auth::requireRole(['AOE', 'COORDENACAO']);

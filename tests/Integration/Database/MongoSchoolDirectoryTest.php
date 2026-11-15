@@ -120,6 +120,37 @@ try {
     checkDirectory($database->classes->countDocuments(['_id' => $raceClass, 'active' => true]) === 1
         && $database->students->countDocuments(['_id' => $raceStudent, 'class_id' => $raceClass]) === 1,
         'Disputa deve preservar turma ativa com o novo aluno.');
+    $studentArchiveSession = Mongo::client()->startSession();
+    try {
+        $studentArchiveSession->startTransaction();
+        checkDirectory($database->students->countDocuments(
+            ['_id' => $raceStudent, 'active' => true], ['session' => $studentArchiveSession]
+        ) === 1, 'Aluno deve estar ativo antes da disputa.');
+        $raceGuardian = $directory->createGuardian(
+            $actor, 'Responsável simultâneo', 'simultaneo@example.org', 'Pai', [$raceStudent]
+        );
+        $conflict = false;
+        try {
+            $database->students->updateOne(
+                ['_id' => $raceStudent, 'active' => true], ['$set' => ['active' => false]],
+                ['session' => $studentArchiveSession]
+            );
+        } catch (Throwable $error) {
+            $conflict = $error->getCode() === 112
+                || (method_exists($error, 'hasErrorLabel') && $error->hasErrorLabel('TransientTransactionError'));
+        }
+        checkDirectory($conflict, 'Arquivamento de aluno deve disputar o novo vínculo.');
+    } finally {
+        try {
+            $studentArchiveSession->abortTransaction();
+        } catch (Throwable) {
+        }
+        $studentArchiveSession->endSession();
+    }
+    checkDirectory($database->students->countDocuments(['_id' => $raceStudent, 'active' => true]) === 1
+        && $database->student_guardians->countDocuments(
+            ['student_id' => $raceStudent, 'guardian_id' => $raceGuardian]
+        ) === 1, 'Disputa deve manter aluno ativo e vínculo confirmado.');
     fwrite(STDOUT, "MongoSchoolDirectoryTest: cadastros, vínculos e autorização passaram.\n");
 } finally {
     $database->drop();

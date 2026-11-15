@@ -58,6 +58,34 @@ try {
             'Somente coordenação pode cadastrar.');
     }
     checkDirectory($database->classes->countDocuments() === 1, 'Ator não autorizado não pode criar turma.');
+    $directory->updateClass($actor, $classId, '5º B', '5º ano', 2026, 'Tarde');
+    $directory->updateStudent($actor, $studentId, 'Aluno Atualizado', 'T-2026-1', $classId);
+    $directory->updateGuardian(
+        $actor, $guardianId, 'Responsável Atualizado', 'novo@example.org', 'Pai', [$studentId, $studentId]
+    );
+    checkDirectory($database->classes->countDocuments(['_id' => $classId, 'name' => '5º B']) === 1,
+        'Edição de turma deve persistir.');
+    checkDirectory($database->students->countDocuments(['_id' => $studentId, 'name' => 'Aluno Atualizado']) === 1,
+        'Edição de aluno deve persistir.');
+    checkDirectory($database->student_guardians->countDocuments(['guardian_id' => $guardianId]) === 1,
+        'Edição deve deduplicar o vínculo.');
+    try {
+        $directory->archive($actor, 'turma', $classId);
+        throw new LogicException('Turma com aluno ativo deveria ser protegida.');
+    } catch (InvalidArgumentException $error) {
+        checkDirectory(str_contains($error->getMessage(), 'alunos ativos'), 'Esperada proteção da turma.');
+    }
+    checkDirectory($database->classes->countDocuments(['_id' => $classId, 'active' => true]) === 1,
+        'Tentativa de arquivar turma deve ser revertida.');
+    $directory->archive($actor, 'aluno', $studentId);
+    $directory->archive($actor, 'turma', $classId);
+    $directory->archive($actor, 'responsavel', $guardianId);
+    checkDirectory($database->classes->countDocuments(['_id' => $classId, 'active' => false]) === 1
+        && $database->students->countDocuments(['_id' => $studentId, 'active' => false]) === 1
+        && $database->guardians->countDocuments(['_id' => $guardianId, 'active' => false]) === 1,
+        'Arquivamento deve manter registros e suas referências.');
+    checkDirectory($database->operation_logs->countDocuments(['action' => 'TURMA_ARQUIVADA', 'entity_id' => (string)$classId]) === 1,
+        'Arquivamento deve gerar auditoria.');
     fwrite(STDOUT, "MongoSchoolDirectoryTest: cadastros, vínculos e autorização passaram.\n");
 } finally {
     $database->drop();

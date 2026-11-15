@@ -59,6 +59,9 @@ jobs:
           php -l src/Database/MongoUserAuthenticator.php
           php -l src/Database/MongoOperationLogWriter.php
           php -l src/Database/MongoSchoolDirectory.php
+          php -l src/mongo_staff_web.php
+          php -l templates/staff_registration.php
+          php -l templates/school_directory.php
           php -l tests/Integration/Database/MongoSchoolDirectoryTest.php
           php -l tests/Integration/Database/MongoTransactionTest.php
           php -l bin/init_mongodb.php

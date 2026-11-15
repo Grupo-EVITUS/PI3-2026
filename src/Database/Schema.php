@@ -97,7 +97,9 @@ final class Schema
                 ['communication_id', 'recipient', 'subject', 'body', 'status', 'created_at'],
                 ['communication_id' => $id, 'recipient' => $text, 'subject' => $text, 'body' => $text,
                  'status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'FALHA', 'QUARENTENA']),
-                 'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate]
+                 'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate,
+                 'next_attempt_at' => $nullableDate, 'claim_id' => $nullableId,
+                 'attempts' => ['bsonType' => ['int', 'long']]]
             ),
             Collections::JUSTIFICATIONS => $schema(
                 ['absence_id', 'communication_id', 'guardian_id', 'reason', 'explanation', 'submitted_at'],
@@ -149,6 +151,8 @@ final class Schema
             Collections::MAIL_QUEUE => [
                 ['key' => ['communication_id' => 1], 'name' => 'queue_communication_unique', 'unique' => true],
                 ['key' => ['status' => 1, 'created_at' => 1], 'name' => 'queue_status_created'],
+                ['key' => ['status' => 1, 'next_attempt_at' => 1], 'name' => 'queue_retry_due'],
+                ['key' => ['status' => 1, 'started_at' => 1], 'name' => 'queue_stale_lease'],
             ],
             Collections::JUSTIFICATIONS => [
                 ['key' => ['absence_id' => 1], 'name' => 'justification_absence_unique', 'unique' => true],

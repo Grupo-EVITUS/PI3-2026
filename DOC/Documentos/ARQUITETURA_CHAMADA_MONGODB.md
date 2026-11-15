@@ -29,7 +29,7 @@ confirmação no banco. O cutover operacional continua separado.
 O primeiro gate da migração histórica é `bin/prepare_sqlite_migration.php`:
 produz cópia SQLite consistente (`VACUUM INTO`) e manifesto sem dados pessoais,
 com hash SHA-256, contagens, integridade, referências e estados da fila. O
-comando não grava no MongoDB. A próxima entrega deve importar a cópia aprovada,
+comando não grava no MongoDB. `bin/import_sqlite_mongodb.php` faz dry-run sem escrita e importa a cópia aprovada em banco isolado. IDs são determinísticos, a retomada confere documentos e contagens, e a fila antiga fica em `QUARENTENA`. A importação de dados reais e o cutover permanecem pendentes,
 colocar e-mails antigos em quarentena e reconciliar contagens/vínculos; nenhum
 status de presença anterior às chamadas existentes pode ser presumido.
 

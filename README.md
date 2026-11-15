@@ -122,7 +122,16 @@ Antes de importar dados reais, gere uma cópia consistente do arquivo SQLite e u
 php bin/prepare_sqlite_migration.php --source=var/saa.sqlite3 --snapshot=var/saa-snapshot.sqlite3 --manifest=var/saa-snapshot.json
 ```
 
-O comando não sobrescreve arquivos existentes, não grava no MongoDB e não envia e-mails. O manifesto inclui hash da cópia, contagens por tabela, migrações aplicadas, integridade, vínculos, chamada histórica e quantidade de mensagens por estado. `blocked` exige correção antes da importação. Uma cópia `ready_for_dry_run` ainda precisa de importador, reconciliação e ensaio de restauração; o SQLite continua ativo.
+O comando não sobrescreve arquivos existentes, não grava no MongoDB e não envia e-mails. O manifesto inclui hash da cópia, contagens por tabela, migrações aplicadas, integridade, vínculos, chamada histórica e quantidade de mensagens por estado. `blocked` exige correção antes da importação.
+
+Para a cópia aprovada, valide a conversão e importe somente em um banco MongoDB novo e isolado:
+
+```bash
+php bin/import_sqlite_mongodb.php --snapshot=var/saa-snapshot.sqlite3 --manifest=var/saa-snapshot.json --target-db=saa_import_ensaio
+php bin/import_sqlite_mongodb.php --snapshot=var/saa-snapshot.sqlite3 --manifest=var/saa-snapshot.json --target-db=saa_import_ensaio --apply
+```
+
+O primeiro comando faz dry-run sem gravação. O segundo grava documentos com IDs determinísticos, reconcilia contagens e aceita retomada da mesma cópia. Toda fila histórica entra em `QUARENTENA`, mesmo quando estava aguardando envio; o worker não a processa. Preserve o snapshot e o banco original, proteja os arquivos que contêm dados pessoais e mantenha `MONGODB_DB` apontando para o banco operacional existente. A troca de produção e o ensaio de restauração ainda dependem de validação operacional.
 
 - `public/index.php`: rotas HTTP e controles de perfil.
 - `src/Services.php`: validações e regras de negócio.

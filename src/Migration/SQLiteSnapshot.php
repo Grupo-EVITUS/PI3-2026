@@ -94,6 +94,10 @@ final class SQLiteSnapshot
                 . 'LEFT JOIN absences a ON a.attendance_session_id = r.session_id AND a.student_id = r.student_id '
                 . "WHERE (r.status = 'AUSENTE' AND a.id IS NULL) OR (r.status = 'PRESENTE' AND a.id IS NOT NULL)"
             )->fetchColumn();
+            $invalid['justification_links'] = (int)$pdo->query(
+                'SELECT COUNT(*) FROM justifications j JOIN communications c ON c.id = j.communication_id '
+                . 'WHERE j.absence_id != c.absence_id OR j.guardian_id != c.guardian_id'
+            )->fetchColumn();
         }
         $queue = [];
         if ($counts['mail_queue'] !== null) {

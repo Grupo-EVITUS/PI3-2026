@@ -53,9 +53,10 @@ final class MongoAttendance
 
         $session = $this->database->getManager()->startSession();
         try {
-            return with_transaction($session, function (Session $session) use (
-                $actor, $classId, $statuses, $attendanceDate, $baseUrl
-            ): array {
+            $result = null;
+            with_transaction($session, function (Session $session) use (
+                $actor, $classId, $statuses, $attendanceDate, $baseUrl, &$result
+            ): void {
                 $options = ['session' => $session];
                 if ($this->database->users->countDocuments(
                     ['_id' => $actor, 'active' => true, 'profile' => ['$in' => ['AOE', 'COORDENACAO']]], $options
@@ -179,13 +180,17 @@ final class MongoAttendance
                         $notifications++;
                     }
                 }
-                return [
+                $result = [
                     'attendance_session_id' => (string)$sessionId,
                     'attendance_counts' => ['present' => count($entries) - $absent,
                         'absent' => $absent, 'total' => count($entries)],
                     'without_guardians' => $withoutGuardians, 'notifications' => $notifications,
                 ];
             });
+            if ($result === null) {
+                throw new RuntimeException('A transação não produziu o resumo da chamada.');
+            }
+            return $result;
         } catch (BulkWriteException $error) {
             if ($error->getCode() !== 11000) {
                 throw $error;

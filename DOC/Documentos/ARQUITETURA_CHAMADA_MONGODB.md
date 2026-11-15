@@ -7,8 +7,15 @@
 **Contrato de persistência:** `attendance_sessions` já possui validação de BSON,
 índice único por `class_id`/`attendance_date` e índice de consulta por data/status.
 `absences.attendance_session_id` é opcional para preservar ocorrências legadas.
-Isso prepara a gravação da chamada; o runtime Mongo ainda não registra sessões,
-justificativas nem envia os e-mails dessa chamada.
+Esse contrato preserva a compatibilidade de ocorrências legadas; justificativas
+e envio de e-mail Mongo ainda não estão conectados.
+
+O serviço `MongoAttendance::record` registra, em uma transação no replica set,
+o roster completo, ausências, auditoria, comunicações e e-mails na fila. Ele
+rejeita chamadas repetidas e alterações concorrentes de turma/aluno/vínculo.
+Ainda não há rota web de chamada Mongo nem processador SMTP Mongo: a fila
+criada pelo serviço não é enviada automaticamente nesta etapa. O modo SQLite
+continua atendendo o fluxo completo até o cutover ensaiado.
 
 ## Diretriz de integração
 

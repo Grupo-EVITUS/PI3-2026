@@ -59,10 +59,12 @@ jobs:
           php -l src/Database/MongoUserAuthenticator.php
           php -l src/Database/MongoOperationLogWriter.php
           php -l src/Database/MongoSchoolDirectory.php
+          php -l src/Database/MongoAttendance.php
           php -l src/mongo_staff_web.php
           php -l templates/staff_registration.php
           php -l templates/school_directory.php
           php -l tests/Integration/Database/MongoSchoolDirectoryTest.php
+          php -l tests/Integration/Database/MongoAttendanceTest.php
           php -l tests/Integration/Database/MongoTransactionTest.php
           php -l bin/init_mongodb.php
           php -l bin/create_initial_admin_mongodb.php
@@ -98,6 +100,8 @@ jobs:
           php -r 'require "vendor/autoload.php"; $db=Saa\Database\Mongo::database(); $u=$db->users->findOne(["email"=>"aoe@example.org"]); $a=$db->users->findOne(["email"=>"coord@example.org"]); exit($u && $a && $db->operation_logs->countDocuments(["action"=>"USUARIO_CRIADO","user_id"=>$a["_id"],"entity_id"=>(string)$u["_id"]])===1 && !$db->users->findOne(["email"=>"denied@example.org"]) ? 0 : 1);'
       - name: Validate MongoDB school directory
         run: php tests/Integration/Database/MongoSchoolDirectoryTest.php
+      - name: Validate transactional attendance and mail outbox
+        run: php tests/Integration/Database/MongoAttendanceTest.php
       - name: Stop MongoDB replica set
         if: always()
         run: docker rm -f saa-mongodb || true

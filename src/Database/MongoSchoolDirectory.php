@@ -41,9 +41,7 @@ final class MongoSchoolDirectory
         $registration = $registration === null || trim($registration) === ''
             ? null : self::requiredText($registration, 80);
         return $this->write($actor, function (Session $session, ObjectId $id) use ($name, $registration, $classId): void {
-            if ($this->database->classes->countDocuments(['_id' => $classId, 'active' => true], ['session' => $session]) !== 1) {
-                throw new InvalidArgumentException('Turma não encontrada ou inativa.');
-            }
+            $this->touchActive('classes', $classId, $session, 'Turma não encontrada ou inativa.');
             $this->database->students->insertOne([
                 '_id' => $id, 'name' => $name, 'registration_no' => $registration,
                 'class_id' => $classId, 'active' => true, 'created_at' => new UTCDateTime(),
@@ -74,6 +72,9 @@ final class MongoSchoolDirectory
                 ['_id' => ['$in' => array_values($unique)], 'active' => true], $options
             ) !== count($unique)) {
                 throw new InvalidArgumentException('Um ou mais alunos não estão disponíveis.');
+            }
+            foreach ($unique as $studentId) {
+                $this->touchActive('students', $studentId, $session, 'Aluno não encontrado ou inativo.');
             }
             $this->database->guardians->insertOne([
                 '_id' => $id, 'name' => $name, 'email' => $email, 'relationship' => $relationship,
@@ -115,9 +116,7 @@ final class MongoSchoolDirectory
             ? null : self::requiredText($registration, 80);
         return $this->write($actor, function (Session $session) use ($studentId, $name, $registration, $classId): void {
             $options = ['session' => $session];
-            if ($this->database->classes->countDocuments(['_id' => $classId, 'active' => true], $options) !== 1) {
-                throw new InvalidArgumentException('Turma não encontrada ou inativa.');
-            }
+            $this->touchActive('classes', $classId, $session, 'Turma não encontrada ou inativa.');
             $result = $this->database->students->updateOne(
                 ['_id' => $studentId, 'active' => true],
                 ['$set' => ['name' => $name, 'registration_no' => $registration, 'class_id' => $classId]],
@@ -152,6 +151,9 @@ final class MongoSchoolDirectory
                 ['_id' => ['$in' => array_values($unique)], 'active' => true], $options
             ) !== count($unique)) {
                 throw new InvalidArgumentException('Um ou mais alunos não estão disponíveis.');
+            }
+            foreach ($unique as $studentId) {
+                $this->touchActive('students', $studentId, $session, 'Aluno não encontrado ou inativo.');
             }
             $result = $this->database->guardians->updateOne(
                 ['_id' => $guardianId, 'active' => true],
@@ -233,6 +235,19 @@ final class MongoSchoolDirectory
             return $id;
         } finally {
             $session->endSession();
+        }
+    }
+
+    private function touchActive(string $collection, ObjectId $id, Session $session, string $message): void
+    {
+        // Esta escrita serializa vínculos concorrentes com o arquivamento do mesmo documento.
+        $result = $this->database->selectCollection($collection)->updateOne(
+            ['_id' => $id, 'active' => true],
+            ['$inc' => ['link_revision' => 1]],
+            ['session' => $session]
+        );
+        if ($result->getMatchedCount() !== 1) {
+            throw new InvalidArgumentException($message);
         }
     }
 

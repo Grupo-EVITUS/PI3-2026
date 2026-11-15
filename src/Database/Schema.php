@@ -37,12 +37,13 @@ final class Schema
             Collections::CLASSES => $schema(
                 ['name', 'grade', 'academic_year', 'shift', 'active', 'created_at'],
                 ['name' => $text, 'grade' => $text, 'academic_year' => ['bsonType' => ['int', 'long']],
-                 'shift' => $enum(['Manhã', 'Tarde', 'Noite', 'Integral']), 'active' => $active, 'created_at' => $date]
+                 'shift' => $enum(['Manhã', 'Tarde', 'Noite', 'Integral']), 'active' => $active, 'created_at' => $date,
+                 'link_revision' => ['bsonType' => ['int', 'long']]]
             ),
             Collections::STUDENTS => $schema(
                 ['name', 'class_id', 'active', 'created_at'],
                 ['name' => $text, 'class_id' => $id, 'registration_no' => ['bsonType' => ['string', 'null']],
-                 'active' => $active, 'created_at' => $date]
+                 'active' => $active, 'created_at' => $date, 'link_revision' => ['bsonType' => ['int', 'long']]]
             ),
             Collections::GUARDIANS => $schema(
                 ['name', 'email', 'relationship', 'active', 'created_at'],

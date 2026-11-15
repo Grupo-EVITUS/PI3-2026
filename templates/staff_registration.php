@@ -3,3 +3,5 @@
     <h1>Cadastro de funcionário</h1>
     <?php require __DIR__ . '/staff_form.php'; ?>
 </section>
+
+<?php require __DIR__ . '/school_directory.php'; ?>

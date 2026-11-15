@@ -5,7 +5,18 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\BulkWriteException;
 use Saa\Database\Mongo;
 use Saa\Database\MongoStaffRegistration;
+use Saa\Database\MongoSchoolDirectory;
+use Saa\Database\Bson;
 use Saa\Database\MongoUserAuthenticator;
+
+function renderSchoolDirectory(): void
+{
+    $database = Mongo::database();
+    $classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
+    $students = $database->students->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
+    $guardians = $database->guardians->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
+    render('staff_registration.php', compact('classes', 'students', 'guardians'));
+}
 
 if ($path === '/' || $path === '/index.php') {
     Auth::redirect(empty($_SESSION['user_id']) ? '/login' : '/cadastros');
@@ -35,12 +46,71 @@ if ($path === '/logout') {
     session_regenerate_id(true);
     Auth::redirect('/login');
 }
-if (!in_array($path, ['/cadastros', '/cadastros/usuario'], true)) {
+if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel'], true)) {
     notFound();
 }
 Auth::requireRole(['COORDENACAO']);
 if ($path === '/cadastros' && $method === 'GET') {
-    render('staff_registration.php');
+    renderSchoolDirectory();
+    return;
+}
+if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel'], true)) {
+    requirePost();
+    try {
+        $values = [];
+        foreach (['name', 'grade', 'shift', 'registration_no', 'email', 'relationship', 'class_id'] as $field) {
+            $values[$field] = $_POST[$field] ?? '';
+        }
+        foreach ($values as $value) {
+            if (!is_string($value)) {
+                throw new InvalidArgumentException('Dados do cadastro inválidos.');
+            }
+        }
+        $actor = Bson::objectId($_SESSION['user_id']);
+        if ($actor === null) {
+            throw new RuntimeException('Sessão inválida.');
+        }
+        $directory = new MongoSchoolDirectory(Mongo::database());
+        if ($path === '/cadastros/turma') {
+            $year = filter_var($_POST['academic_year'] ?? null, FILTER_VALIDATE_INT);
+            if (!is_int($year)) {
+                throw new InvalidArgumentException('Ano inválido.');
+            }
+            $directory->createClass($actor, $values['name'], $values['grade'], $year, $values['shift']);
+        } elseif ($path === '/cadastros/aluno') {
+            $classId = Bson::objectId($values['class_id']);
+            if ($classId === null) {
+                throw new InvalidArgumentException('Turma inválida.');
+            }
+            $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId);
+        } else {
+            $studentIds = $_POST['student_ids'] ?? [];
+            if (!is_array($studentIds)) {
+                throw new InvalidArgumentException('Alunos inválidos.');
+            }
+            $ids = [];
+            foreach ($studentIds as $studentId) {
+                $id = Bson::objectId($studentId);
+                if ($id === null) {
+                    throw new InvalidArgumentException('Aluno inválido.');
+                }
+                $ids[] = $id;
+            }
+            $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids);
+        }
+        flash('Cadastro escolar salvo.');
+        Auth::redirect('/cadastros');
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        flash($error->getMessage(), 'error');
+    } catch (BulkWriteException $error) {
+        if ($error->getCode() !== 11000) {
+            throw $error;
+        }
+        http_response_code(409);
+        flash('Este cadastro já existe.', 'error');
+    }
+    renderSchoolDirectory();
     return;
 }
 if ($path !== '/cadastros/usuario') {
@@ -70,4 +140,4 @@ try {
     http_response_code(409);
     flash('Já existe um cadastro com esse e-mail.', 'error');
 }
-render('staff_registration.php');
+renderSchoolDirectory();

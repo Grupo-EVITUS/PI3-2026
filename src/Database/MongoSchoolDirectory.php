@@ -177,6 +177,9 @@ final class MongoSchoolDirectory
                     $activeStudentIds[] = $student['_id'];
                 }
             }
+            foreach ($activeStudentIds as $studentId) {
+                $this->touchActive('students', $studentId, $session, 'Aluno não encontrado ou inativo.');
+            }
             if ($activeStudentIds !== []) {
                 $this->database->student_guardians->deleteMany(
                     ['guardian_id' => $guardianId, 'student_id' => ['$in' => $activeStudentIds]], $options

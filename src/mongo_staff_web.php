@@ -12,10 +12,22 @@ use Saa\Database\MongoUserAuthenticator;
 function renderSchoolDirectory(): void
 {
     $database = Mongo::database();
+    $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+    if ($actor === null || $database->users->countDocuments(
+        ['_id' => $actor, 'profile' => 'COORDENACAO', 'active' => true]
+    ) !== 1) {
+        http_response_code(403);
+        render('error.php', ['title' => 'Acesso negado', 'message' => 'Seu acesso não está ativo.']);
+        return;
+    }
     $classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
     $students = $database->students->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
     $guardians = $database->guardians->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-    render('staff_registration.php', compact('classes', 'students', 'guardians'));
+    $links = [];
+    foreach ($database->student_guardians->find() as $link) {
+        $links[(string)$link['guardian_id']][] = (string)$link['student_id'];
+    }
+    render('staff_registration.php', compact('classes', 'students', 'guardians', 'links'));
 }
 
 if ($path === '/' || $path === '/index.php') {
@@ -46,7 +58,7 @@ if ($path === '/logout') {
     session_regenerate_id(true);
     Auth::redirect('/login');
 }
-if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel'], true)) {
+if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel', '/cadastros/arquivar'], true)) {
     notFound();
 }
 Auth::requireRole(['COORDENACAO']);
@@ -54,7 +66,7 @@ if ($path === '/cadastros' && $method === 'GET') {
     renderSchoolDirectory();
     return;
 }
-if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel'], true)) {
+if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel', '/cadastros/arquivar'], true)) {
     requirePost();
     try {
         $values = [];
@@ -71,18 +83,43 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
             throw new RuntimeException('Sessão inválida.');
         }
         $directory = new MongoSchoolDirectory(Mongo::database());
+        $target = $_POST['id'] ?? '';
+        if (!is_string($target)) {
+            throw new InvalidArgumentException('Identificador inválido.');
+        }
+        $targetId = $target === '' ? null : Bson::objectId($target);
+        if ($target !== '' && $targetId === null) {
+            throw new InvalidArgumentException('Identificador inválido.');
+        }
+        if ($path === '/cadastros/arquivar') {
+            $entity = $_POST['entity'] ?? '';
+            if (!is_string($entity) || $targetId === null) {
+                throw new InvalidArgumentException('Cadastro inválido.');
+            }
+            $directory->archive($actor, $entity, $targetId);
+            flash('Cadastro arquivado.');
+            Auth::redirect('/cadastros');
+        }
         if ($path === '/cadastros/turma') {
             $year = filter_var($_POST['academic_year'] ?? null, FILTER_VALIDATE_INT);
             if (!is_int($year)) {
                 throw new InvalidArgumentException('Ano inválido.');
             }
-            $directory->createClass($actor, $values['name'], $values['grade'], $year, $values['shift']);
+            if ($targetId === null) {
+                $directory->createClass($actor, $values['name'], $values['grade'], $year, $values['shift']);
+            } else {
+                $directory->updateClass($actor, $targetId, $values['name'], $values['grade'], $year, $values['shift']);
+            }
         } elseif ($path === '/cadastros/aluno') {
             $classId = Bson::objectId($values['class_id']);
             if ($classId === null) {
                 throw new InvalidArgumentException('Turma inválida.');
             }
-            $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId);
+            if ($targetId === null) {
+                $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId);
+            } else {
+                $directory->updateStudent($actor, $targetId, $values['name'], $values['registration_no'], $classId);
+            }
         } else {
             $studentIds = $_POST['student_ids'] ?? [];
             if (!is_array($studentIds)) {
@@ -96,7 +133,11 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
                 }
                 $ids[] = $id;
             }
-            $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids);
+            if ($targetId === null) {
+                $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids);
+            } else {
+                $directory->updateGuardian($actor, $targetId, $values['name'], $values['email'], $values['relationship'], $ids);
+            }
         }
         flash('Cadastro escolar salvo.');
         Auth::redirect('/cadastros');

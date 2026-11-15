@@ -61,8 +61,11 @@ jobs:
           php -l src/Database/MongoSchoolDirectory.php
           php -l src/Database/MongoAttendance.php
           php -l src/mongo_staff_web.php
+          php -l src/Helpers.php
           php -l templates/staff_registration.php
           php -l templates/school_directory.php
+          php -l templates/mongo_attendance.php
+          php -l templates/mongo_attendance_result.php
           php -l tests/Integration/Database/MongoSchoolDirectoryTest.php
           php -l tests/Integration/Database/MongoAttendanceTest.php
           php -l tests/Integration/Database/MongoTransactionTest.php
@@ -86,6 +89,7 @@ jobs:
       - name: Validate login and staff registration over HTTP
         env:
           SAA_WEB_MODE: mongo_staff
+          SAA_MONGO_ATTENDANCE_PREVIEW: "true"
           MONGODB_DB: saa_web_ci
           INITIAL_ADMIN_NAME: Coordenação
           INITIAL_ADMIN_EMAIL: coord@example.org
@@ -97,6 +101,7 @@ jobs:
           trap 'kill $!' EXIT
           curl --retry 8 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8765/login > /dev/null
           python3 tests/Integration/staff_web.py
+          php -r 'require "vendor/autoload.php"; $db=Saa\Database\Mongo::database(); exit($db->attendance_sessions->countDocuments()===1 && $db->absences->countDocuments()===1 && $db->mail_queue->countDocuments(["status"=>"AGUARDANDO"])===1 ? 0 : 1);'
           php -r 'require "vendor/autoload.php"; $db=Saa\Database\Mongo::database(); $u=$db->users->findOne(["email"=>"aoe@example.org"]); $a=$db->users->findOne(["email"=>"coord@example.org"]); exit($u && $a && $db->operation_logs->countDocuments(["action"=>"USUARIO_CRIADO","user_id"=>$a["_id"],"entity_id"=>(string)$u["_id"]])===1 && !$db->users->findOne(["email"=>"denied@example.org"]) ? 0 : 1);'
       - name: Validate MongoDB school directory
         run: php tests/Integration/Database/MongoSchoolDirectoryTest.php

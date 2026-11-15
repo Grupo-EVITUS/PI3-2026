@@ -12,6 +12,14 @@ use Saa\Database\MongoUserAuthenticator;
 function renderSchoolDirectory(): void
 {
     $database = Mongo::database();
+    $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+    if ($actor === null || $database->users->countDocuments(
+        ['_id' => $actor, 'profile' => 'COORDENACAO', 'active' => true]
+    ) !== 1) {
+        http_response_code(403);
+        render('error.php', ['title' => 'Acesso negado', 'message' => 'Seu acesso não está ativo.']);
+        return;
+    }
     $classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
     $students = $database->students->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
     $guardians = $database->guardians->find(['active' => true], ['sort' => ['name' => 1]])->toArray();

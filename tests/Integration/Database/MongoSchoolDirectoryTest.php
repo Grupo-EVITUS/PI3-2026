@@ -86,6 +86,10 @@ try {
         'Arquivamento deve manter registros e suas referências.');
     checkDirectory($database->operation_logs->countDocuments(['action' => 'TURMA_ARQUIVADA', 'entity_id' => (string)$classId]) === 1,
         'Arquivamento deve gerar auditoria.');
+    $directory->updateGuardian($actor, $secondGuardian, 'Outro Responsável Atualizado',
+        'responsavel@example.org', 'Pai', []);
+    checkDirectory($database->student_guardians->countDocuments(['guardian_id' => $secondGuardian, 'student_id' => $studentId]) === 1,
+        'Editar responsável deve preservar vínculo histórico com aluno arquivado.');
     fwrite(STDOUT, "MongoSchoolDirectoryTest: cadastros, vínculos e autorização passaram.\n");
 } finally {
     $database->drop();

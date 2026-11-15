@@ -3,5 +3,5 @@
     <span class="eyebrow">Presença</span>
     <h1><?= e($title ?? 'Não foi possível continuar') ?></h1>
     <p><?= e($message ?? 'Ocorreu um erro ao processar sua solicitação.') ?></p>
-    <a class="button button-quiet" href="<?= isset($_SESSION['user_id']) ? '/ocorrencias' : '/login' ?>">Voltar</a>
+    <a class="button button-quiet" href="<?= isset($_SESSION['user_id']) ? staffHomePath() : '/login' ?>">Voltar</a>
 </section>

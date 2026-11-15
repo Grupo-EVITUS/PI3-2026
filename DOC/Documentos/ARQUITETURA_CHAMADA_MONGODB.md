@@ -13,9 +13,17 @@ e envio de e-mail Mongo ainda não estão conectados.
 O serviço `MongoAttendance::record` registra, em uma transação no replica set,
 o roster completo, ausências, auditoria, comunicações e e-mails na fila. Ele
 rejeita chamadas repetidas e alterações concorrentes de turma/aluno/vínculo.
-Ainda não há rota web de chamada Mongo nem processador SMTP Mongo: a fila
-criada pelo serviço não é enviada automaticamente nesta etapa. O modo SQLite
-continua atendendo o fluxo completo até o cutover ensaiado.
+Ainda não há processador SMTP Mongo: a fila criada pelo serviço não é enviada
+automaticamente nesta etapa. O modo SQLite continua atendendo o fluxo
+completo até o cutover ensaiado.
+
+A rota `/chamada` existe apenas para homologação quando
+`SAA_WEB_MODE=mongo_staff` e `SAA_MONGO_ATTENDANCE_PREVIEW=true` são configurados
+explicitamente. Ela autentica AOE/Coordenação, revalida a conta ativa, exige
+CSRF e usa o serviço transacional. O padrão continua desligado. A interface
+avisa que o e-mail fica na fila e que o link de justificativa ainda não
+funciona; não habilitar essa opção como fluxo operacional até SMTP e
+justificativa Mongo serem testados de ponta a ponta.
 
 ## Diretriz de integração
 

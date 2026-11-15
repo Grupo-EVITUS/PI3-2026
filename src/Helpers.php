@@ -6,6 +6,20 @@ function e(mixed $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function mongoAttendancePreviewEnabled(): bool
+{
+    return getenv('SAA_WEB_MODE') === 'mongo_staff'
+        && strtolower(getenv('SAA_MONGO_ATTENDANCE_PREVIEW') ?: '') === 'true';
+}
+
+function staffHomePath(): string
+{
+    if (getenv('SAA_WEB_MODE') !== 'mongo_staff') {
+        return '/ocorrencias';
+    }
+    return ($_SESSION['profile'] ?? '') === 'AOE' && mongoAttendancePreviewEnabled() ? '/chamada' : '/cadastros';
+}
+
 function render(string $template, array $data = []): void
 {
     extract($data, EXTR_SKIP);

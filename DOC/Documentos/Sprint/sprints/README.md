@@ -13,4 +13,4 @@
 
 Documentos de apoio: [review consolidada](../review.md), [mapa das sprints](../MAPA_SPRINTS.md), [rastreabilidade](RASTREABILIDADE.md), [pendências](PENDENCIAS.md).
 
-**Nota:** os documentos mais antigos incluem propostas Flask/MongoDB. A `main` atual contém um MVP executável em PHP/SQLite. Consultar o [README principal](../../README.md) e os commits citados na rastreabilidade. Um item só deve aparecer como homologado com evidência de execução e aceite.
+**Nota:** os documentos mais antigos incluem propostas Flask/MongoDB. A referência auditada contém um MVP executável em PHP/SQLite; a `main` atual também contém componentes MongoDB em migração por etapas. Consultar o [README principal](../../../../README.md) e os commits citados na rastreabilidade. Um item só deve aparecer como homologado com evidência de execução e aceite.

@@ -5,3 +5,5 @@ node_modules/
 var/
 .env
 vendor/
+__pycache__/
+*.pyc

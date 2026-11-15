@@ -32,15 +32,15 @@ Requisitos históricos para agregações MongoDB, webhook de abertura de e-mail,
 
 ## 3. Modelo de dados e evolução
 
-O plano histórico MongoDB usava `students`, `enrollments`, `attendance_records`, `guardians`, `justifications`, `justification_links`, `email_notifications`, `audit_events` e `attendance_policies`. Na versão executável, o esquema efetivo está em [`migrations/001_initial.sql`](../../../migrations/001_initial.sql), com tabelas relacionais `users`, `classes`, `students`, `guardians`, `student_guardians`, `absences`, `communications`, `mail_queue`, `justifications` e `operation_logs`.
+O plano histórico MongoDB usava `students`, `enrollments`, `attendance_records`, `guardians`, `justifications`, `justification_links`, `email_notifications`, `audit_events` e `attendance_policies`. Na versão executável, o esquema efetivo está em [`migrations/001_initial.sql`](../../../../../migrations/001_initial.sql), com tabelas relacionais `users`, `classes`, `students`, `guardians`, `student_guardians`, `absences`, `communications`, `mail_queue`, `justifications` e `operation_logs`.
 
 Diferenças importantes: o aluno aponta diretamente para uma turma no MVP PHP, sem coleção/tabela histórica `enrollments`; só são registradas **ausências diárias**, não presenças `PRESENT`/`ABSENT`; o dashboard de frequência não está implementado.
 
 ## 4. Diagrama e protótipo
 
-- Diagrama de classes existente: [`Diagramas/Diagram De Classe/Diagrama De Classe.jpg`](../../../Diagramas/Diagram%20De%20Classe/Diagrama%20De%20Classe.jpg). **Rever aderência** ao esquema PHP antes do aceite da issue #18.
+- Diagrama de classes versionado: [`Diagramas/Diagram De Classe/03_classes_dominio.png`](../../../Diagramas/Diagram%20De%20Classe/03_classes_dominio.png). **Rever aderência** ao esquema PHP antes do aceite da issue #18.
 - Os arquivos antigos `diagrama_classes_saa.mmd`, `diagrama_classes_saa.png`, `views/templates/aoe_login.html` e `views/static/css/saa.css` **não existem neste caminho na `main`**. Portanto, não devem ser citados como entregas disponíveis nesta pasta.
-- Tela de login executável atual: [`templates/login.php`](../../../templates/login.php), com rotas em [`public/index.php`](../../../public/index.php), adicionadas em 27/10. Não comprova protótipo entregue em setembro.
+- Tela de login executável atual: [`templates/login.php`](../../../../../templates/login.php), com rotas em [`public/index.php`](../../../../../public/index.php), adicionadas em 27/10. Não comprova protótipo entregue em setembro.
 
 ## 5. Casos de aceitação pendentes de evidência
 

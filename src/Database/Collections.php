@@ -22,6 +22,8 @@ final class Collections
 
     // Registro canônico de uma turma e data, sem presença presumida na importação.
     public const ATTENDANCE_SESSIONS = 'attendance_sessions';
+    public const LEGACY_ATTENDANCE_SESSIONS = 'legacy_attendance_sessions';
+    public const LEGACY_ATTENDANCE_RECORDS = 'legacy_attendance_records';
 
     /** @return list<string> */
     public static function legacyImport(): array
@@ -30,6 +32,7 @@ final class Collections
             self::USERS, self::CLASSES, self::STUDENTS, self::GUARDIANS,
             self::STUDENT_GUARDIANS, self::ABSENCES, self::JUSTIFICATIONS,
             self::COMMUNICATIONS, self::MAIL_QUEUE, self::OPERATION_LOGS,
+            self::LEGACY_ATTENDANCE_SESSIONS, self::LEGACY_ATTENDANCE_RECORDS,
         ];
     }
 }

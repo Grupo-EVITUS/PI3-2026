@@ -114,6 +114,16 @@ Os testes cobrem lote de ausências, bloqueio de duplicidade sem inserção parc
 
 ## Arquitetura e evolução
 
+### Preparação da migração para MongoDB
+
+Antes de importar dados reais, gere uma cópia consistente do arquivo SQLite e um manifesto sem dados pessoais:
+
+```powershell
+php bin/prepare_sqlite_migration.php --source=var/saa.sqlite3 --snapshot=var/saa-snapshot.sqlite3 --manifest=var/saa-snapshot.json
+```
+
+O comando não sobrescreve arquivos existentes, não grava no MongoDB e não envia e-mails. O manifesto inclui hash da cópia, contagens por tabela, migrações aplicadas, integridade, vínculos, chamada histórica e quantidade de mensagens por estado. `blocked` exige correção antes da importação. Uma cópia `ready_for_dry_run` ainda precisa de importador, reconciliação e ensaio de restauração; o SQLite continua ativo.
+
 - `public/index.php`: rotas HTTP e controles de perfil.
 - `src/Services.php`: validações e regras de negócio.
 - `src/Database.php` e `migrations/`: persistência, seed, aplicação rastreada de migrações e esquema.

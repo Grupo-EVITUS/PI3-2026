@@ -9,6 +9,15 @@ use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\Bson;
 use Saa\Database\MongoUserAuthenticator;
 
+function renderSchoolDirectory(): void
+{
+    $database = Mongo::database();
+    $classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
+    $students = $database->students->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
+    $guardians = $database->guardians->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
+    render('staff_registration.php', compact('classes', 'students', 'guardians'));
+}
+
 if ($path === '/' || $path === '/index.php') {
     Auth::redirect(empty($_SESSION['user_id']) ? '/login' : '/cadastros');
 }
@@ -42,12 +51,7 @@ if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/
 }
 Auth::requireRole(['COORDENACAO']);
 if ($path === '/cadastros' && $method === 'GET') {
-<?php
-$database = Mongo::database();
-$classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-$students = $database->students->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-$guardians = $database->guardians->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-render('staff_registration.php', compact('classes', 'students', 'guardians'));
+    renderSchoolDirectory();
     return;
 }
 if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel'], true)) {
@@ -106,12 +110,7 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
         http_response_code(409);
         flash('Este cadastro já existe.', 'error');
     }
-<?php
-$database = Mongo::database();
-$classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-$students = $database->students->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-$guardians = $database->guardians->find(['active' => true], ['sort' => ['name' => 1]])->toArray();
-render('staff_registration.php', compact('classes', 'students', 'guardians'));
+    renderSchoolDirectory();
     return;
 }
 if ($path !== '/cadastros/usuario') {
@@ -141,4 +140,4 @@ try {
     http_response_code(409);
     flash('Já existe um cadastro com esse e-mail.', 'error');
 }
-render('staff_registration.php');
+renderSchoolDirectory();

@@ -5,7 +5,7 @@ namespace Saa\Database;
 
 /**
  * Nomes de coleções compatíveis com o contrato SQLite que será importado na etapa 4.
- * attendance_sessions é reservado para a chamada completa da etapa 5; não é gravado nesta etapa.
+ * attendance_sessions guarda a chamada completa no MongoDB, separada da importação legada.
  */
 final class Collections
 {
@@ -20,7 +20,7 @@ final class Collections
     public const MAIL_QUEUE = 'mail_queue';
     public const OPERATION_LOGS = 'operation_logs';
 
-    // Reservada ao registro canônico da chamada completa na etapa 5.
+    // Registro canônico de uma turma e data, sem presença presumida na importação.
     public const ATTENDANCE_SESSIONS = 'attendance_sessions';
 
     /** @return list<string> */

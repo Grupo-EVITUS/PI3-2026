@@ -7,9 +7,9 @@
     </div>
 </section>
 <div class="notice notice-warning" role="status">
-    <strong>Envio de e-mails ainda indisponível neste modo.</strong>
-    A chamada cria comunicações na fila MongoDB, mas elas não são enviadas e o link de justificativa ainda não funciona.
-    Use esta tela somente para testes de homologação.
+    <strong>Homologação MongoDB.</strong>
+    A chamada coloca as comunicações na fila. O envio depende da execução do worker SMTP MongoDB;
+    a justificativa fica disponível depois da entrega. Use esta tela somente para testes de homologação.
 </div>
 <section class="card form-card class-selector-card">
     <form method="get" action="/chamada" class="class-selector-form">

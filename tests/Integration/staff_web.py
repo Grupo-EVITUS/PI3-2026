@@ -105,7 +105,7 @@ assert status == 200
 guest_status, guest_page = request(browser(), "/chamada")
 assert guest_status == 200 and 'action="/login"' in guest_page
 status, attendance_page = request(aoe, "/chamada?turma_id=" + attendance_class)
-assert status == 200 and "Envio de e-mails ainda indisponível" in attendance_page
+assert status == 200 and "O envio depende da execução do worker SMTP" in attendance_page
 student_ids = re.findall(r'name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', attendance_page)
 assert len(student_ids) == 2 and first_id in student_ids
 partial = {"class_id": attendance_class, "absence_date": "2026-11-15",
@@ -115,7 +115,7 @@ status, invalid = request(aoe, "/chamada", partial)
 assert status == 422 and "todos os alunos ativos" in invalid
 full = dict(partial, **{"attendance[" + next(x for x in student_ids if x != first_id) + "]": "PRESENTE"})
 status, summary = request(aoe, "/chamada", full)
-assert status == 200 and "Chamada registrada" in summary and "Não houve envio de e-mail" in summary
+assert status == 200 and "Chamada registrada" in summary and "não envia e-mail diretamente" in summary
 assert "1 comunicação(ões) aguardam" in summary
 status, duplicate = request(aoe, "/chamada", full)
 assert status == 422 and "Já existe uma chamada" in duplicate

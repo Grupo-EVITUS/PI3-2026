@@ -66,6 +66,21 @@ php bin/process_mail_queue.php --watch
 
 Não salve segredos em arquivos versionados. Use o gerenciador de segredos do ambiente de hospedagem, HTTPS e `SESSION_COOKIE_SECURE=true` em produção.
 
+### Fluxo MongoDB em homologação
+
+O modo `SAA_WEB_MODE=mongo_staff` usa Composer, a extensão PHP `mongodb` e MongoDB 7 em replica set. A chamada Mongo só aparece quando `SAA_MONGO_ATTENDANCE_PREVIEW=true` é definido explicitamente. Após configurar `MONGODB_URI`, `MONGODB_DB`, `PUBLIC_BASE_URL` e SMTP, aplique o schema com `php bin/init_mongodb.php`, crie a conta inicial conforme `bin/create_initial_admin_mongodb.php` e execute a aplicação e o worker separadamente:
+
+```powershell
+$env:SAA_WEB_MODE = "mongo_staff"
+$env:SAA_MONGO_ATTENDANCE_PREVIEW = "true"
+$env:MAIL_MODE = "smtp"
+php -S 127.0.0.1:8000 router.php
+# Em outro terminal com as mesmas variáveis e SMTP configurado:
+php bin/process_mail_queue_mongodb.php --watch
+```
+
+O worker reivindica cada e-mail, tenta novamente falhas transitórias até três vezes com intervalo e ignora itens em `QUARENTENA`. Depois do SMTP, o responsável pode justificar pelo link individual. A entrega é **ao menos uma vez** se houver queda entre a aceitação do SMTP e a confirmação no banco. A importação de dados SQLite, a reconciliação e a troca operacional ainda não foram concluídas; mantenha a prévia desligada para uso escolar real até esses passos.
+
 ## Perfis e funcionalidades
 
 - **AOE:** registrar ausências, consultar ocorrências e reenviar comunicações com falha.

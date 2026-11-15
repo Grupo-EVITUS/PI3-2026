@@ -6,34 +6,30 @@
 
 ## O que contém
 
-| # | Diagrama | Finalidade | Fonte editável | Imagem vetorial |
-|---|---|---|---|---|
-| 1 | Casos de uso | Papéis e funcionalidades | [`01_casos_de_uso.mmd`](fontes_mermaid/01_casos_de_uso.mmd) | [SVG](diagramas_visuais/01_casos_de_uso.svg) / [PNG](diagramas_visuais/01_casos_de_uso.png) |
-| 2 | Atividades / fluxo | Ausência → fila → justificativa | [`02_atividades_fluxo.mmd`](fontes_mermaid/02_atividades_fluxo.mmd) | [SVG](diagramas_visuais/02_atividades_fluxo.svg) / [PNG](diagramas_visuais/02_atividades_fluxo.png) |
-| 3 | Classes do domínio | Objetos de negócio conceituais | [`03_classes_dominio.mmd`](fontes_mermaid/03_classes_dominio.mmd) | [SVG](diagramas_visuais/03_classes_dominio.svg) / [PNG](diagramas_visuais/03_classes_dominio.png) |
-| 4 | DER do SQLite | Tabelas, campos e relações | [`04_der_sqlite.mmd`](fontes_mermaid/04_der_sqlite.mmd) | [SVG](diagramas_visuais/04_der_sqlite.svg) / [PNG](diagramas_visuais/04_der_sqlite.png) |
-| 5 | Sequência | Interações PHP, serviço, SQLite, worker e responsável | [`05_sequencia_registro_justificativa.mmd`](fontes_mermaid/05_sequencia_registro_justificativa.mmd) | [SVG](diagramas_visuais/05_sequencia_registro_justificativa.svg) / [PNG](diagramas_visuais/05_sequencia_registro_justificativa.png) |
-| 6 | Estados | Ciclos separados da ausência, comunicação e fila | [`06_estados_ausencia_comunicacao.mmd`](fontes_mermaid/06_estados_ausencia_comunicacao.mmd) | [SVG](diagramas_visuais/06_estados_ausencia_comunicacao.svg) / [PNG](diagramas_visuais/06_estados_ausencia_comunicacao.png) |
+Os seis diagramas PNG versionados nesta pasta representam a referência PHP/SQLite do commit indicado acima. Os arquivos Mermaid e SVG mencionados no índice anterior não estão presentes no repositório.
+
+| Diagrama | Imagem disponível |
+|---|---|
+| Casos de uso | [PNG](Diagrama%20de%20Caso%20de%20Uso/01_casos_de_uso.png) |
+| Atividades / fluxo | [PNG](Diagrama%20de%20Fluxo/02_atividades_fluxo.png) |
+| Classes do domínio | [PNG](Diagram%20De%20Classe/03_classes_dominio.png) |
+| DER do SQLite | [PNG](Diagrama%20Entidade-Relacionamento/04_der_sqlite.png) |
+| Sequência | [PNG](Diagrama%20de%20Sequ%C3%AAncia/05_sequencia_registro_justificativa.png) |
+| Estados | [PNG](Diagrama%20de%20Estados/06_estados_ausencia_comunicacao%20%282%29.png) |
 
 ## Pré-visualização
 
-### Casos de uso
-![Casos de uso](diagramas_visuais/01_casos_de_uso.svg)
+![Casos de uso](Diagrama%20de%20Caso%20de%20Uso/01_casos_de_uso.png)
 
-### Atividades / fluxo
-![Atividades / fluxo](diagramas_visuais/02_atividades_fluxo.svg)
+![Atividades](Diagrama%20de%20Fluxo/02_atividades_fluxo.png)
 
-### Classes do domínio
-![Classes do domínio](diagramas_visuais/03_classes_dominio.svg)
+![Classes](Diagram%20De%20Classe/03_classes_dominio.png)
 
-### DER do SQLite
-![DER do SQLite](diagramas_visuais/04_der_sqlite.svg)
+![DER](Diagrama%20Entidade-Relacionamento/04_der_sqlite.png)
 
-### Sequência
-![Sequência](diagramas_visuais/05_sequencia_registro_justificativa.svg)
+![Sequência](Diagrama%20de%20Sequ%C3%AAncia/05_sequencia_registro_justificativa.png)
 
-### Estados
-![Estados](diagramas_visuais/06_estados_ausencia_comunicacao.svg)
+![Estados](Diagrama%20de%20Estados/06_estados_ausencia_comunicacao%20%282%29.png)
 
 ## Premissas e limitações técnicas
 
@@ -46,12 +42,9 @@
 7. A versão PHP possui perfis `AOE`, `COORDENACAO`, `DIRETOR`, diferentes dos materiais legados Flask/MongoDB. Diretor tem permissão de consulta, não escrita; Coordenação gerencia cadastros.
 8. Diagramas mostram o fluxo funcional de forma simplificada; não substituem a execução de testes, auditoria de segurança, nem homologação de SMTP.
 
-## Como editar e publicar no GitHub
+## Edição
 
-- **Mermaid:** edite os `.mmd` em `fontes_mermaid/` e copie seu conteúdo dentro de um bloco `mermaid` de Markdown para renderizar no GitHub.
-- **Graphviz:** os `.dot` em `fontes_graphviz/` são fontes dos desenhos produzidos (o diagrama 05 usa Mermaid + desenho vetorial de linhas de vida).
-- **Visual:** `.svg` é vetor escalável e `.png` é rasterizado para apresentação. O arquivo `index.html` abre os seis visuais em um navegador.
-- Sugestão: coloque esta pasta em `Diagramas/Versao_PHP_SQLite/`, preservando os JPG/JPEG já existentes para rastreabilidade histórica.
+Estas imagens não incluem fontes editáveis versionadas. Para alterações nos diagramas, produzir a fonte correspondente e incluí-la junto à imagem revisada, com indicação da versão do sistema representada.
 
 ## Base consultada
 

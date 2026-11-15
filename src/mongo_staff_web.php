@@ -6,8 +6,38 @@ use MongoDB\Driver\Exception\BulkWriteException;
 use Saa\Database\Mongo;
 use Saa\Database\MongoStaffRegistration;
 use Saa\Database\MongoSchoolDirectory;
+use Saa\Database\MongoAttendance;
 use Saa\Database\Bson;
 use Saa\Database\MongoUserAuthenticator;
+
+function renderMongoAttendance(?string $error = null, array $selectedAttendance = []): void
+{
+    $database = Mongo::database();
+    $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+    if ($actor === null || $database->users->countDocuments([
+        '_id' => $actor, 'active' => true, 'profile' => ['$in' => ['AOE', 'COORDENACAO']],
+    ]) !== 1) {
+        http_response_code(403);
+        render('error.php', ['title' => 'Acesso negado', 'message' => 'Seu acesso não está ativo.']);
+        return;
+    }
+    $classes = $database->classes->find(['active' => true], ['sort' => ['name' => 1], 'limit' => 200])->toArray();
+    $rawClass = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['class_id'] ?? null) : ($_GET['turma_id'] ?? null);
+    $classId = Bson::objectId($rawClass);
+    $students = [];
+    if ($classId !== null) {
+        $students = $database->students->find(
+            ['class_id' => $classId, 'active' => true],
+            ['sort' => ['name' => 1, '_id' => 1], 'limit' => 1001]
+        )->toArray();
+    } elseif ($rawClass !== null && $rawClass !== '') {
+        http_response_code(422);
+        $error = 'Turma inválida.';
+    }
+    $date = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['absence_date'] ?? null) : null;
+    $absenceDate = is_string($date) && Bson::isDay($date) ? $date : date('Y-m-d');
+    render('mongo_attendance.php', compact('classes', 'classId', 'students', 'error', 'selectedAttendance', 'absenceDate'));
+}
 
 function renderSchoolDirectory(): void
 {
@@ -31,7 +61,7 @@ function renderSchoolDirectory(): void
 }
 
 if ($path === '/' || $path === '/index.php') {
-    Auth::redirect(empty($_SESSION['user_id']) ? '/login' : '/cadastros');
+    Auth::redirect(empty($_SESSION['user_id']) ? '/login' : staffHomePath());
 }
 if ($path === '/login') {
     $email = '';
@@ -44,7 +74,7 @@ if ($path === '/login') {
             session_regenerate_id(true);
             $_SESSION = ['user_id' => $user['id'], 'user_name' => $user['name'], 'profile' => $user['profile']];
             Auth::csrfToken();
-            Auth::redirect('/cadastros');
+            Auth::redirect(staffHomePath());
         }
         http_response_code(401);
         $error = 'E-mail ou senha inválidos.';
@@ -57,6 +87,31 @@ if ($path === '/logout') {
     $_SESSION = [];
     session_regenerate_id(true);
     Auth::redirect('/login');
+}
+if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
+    Auth::requireRole(['AOE', 'COORDENACAO']);
+    if ($method === 'GET') {
+        renderMongoAttendance();
+        return;
+    }
+    requirePost();
+    try {
+        $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+        $classId = Bson::objectId($_POST['class_id'] ?? null);
+        $date = $_POST['absence_date'] ?? null;
+        $attendance = $_POST['attendance'] ?? null;
+        if ($actor === null || $classId === null || !is_string($date) || !is_array($attendance)) {
+            throw new InvalidArgumentException('Informe turma, data e chamada completa.');
+        }
+        $result = (new MongoAttendance(Mongo::database()))->record(
+            $actor, $classId, $attendance, $date, baseUrl()
+        );
+        render('mongo_attendance_result.php', ['result' => $result, 'date' => $date]);
+    } catch (InvalidArgumentException|DomainException $error) {
+        http_response_code(422);
+        renderMongoAttendance($error->getMessage(), is_array($_POST['attendance'] ?? null) ? $_POST['attendance'] : []);
+    }
+    return;
 }
 if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel', '/cadastros/arquivar'], true)) {
     notFound();

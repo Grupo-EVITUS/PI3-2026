@@ -38,7 +38,7 @@ Diferenças importantes: o aluno aponta diretamente para uma turma no MVP PHP, s
 
 ## 4. Diagrama e protótipo
 
-- Diagrama de classes versionado: [`Diagramas/Diagram De Classe/Diagrama De Classe.jpg`](../../../Diagramas/Diagram%20De%20Classe/03_classes_dominio.png). **Rever aderência** ao esquema PHP antes do aceite da issue #18.
+- Diagrama de classes versionado: [`Diagramas/Diagram De Classe/03_classes_dominio.png`](../../../Diagramas/Diagram%20De%20Classe/03_classes_dominio.png). **Rever aderência** ao esquema PHP antes do aceite da issue #18.
 - Os arquivos antigos `diagrama_classes_saa.mmd`, `diagrama_classes_saa.png`, `views/templates/aoe_login.html` e `views/static/css/saa.css` **não existem neste caminho na `main`**. Portanto, não devem ser citados como entregas disponíveis nesta pasta.
 - Tela de login executável atual: [`templates/login.php`](../../../../../templates/login.php), com rotas em [`public/index.php`](../../../../../public/index.php), adicionadas em 27/10. Não comprova protótipo entregue em setembro.
 

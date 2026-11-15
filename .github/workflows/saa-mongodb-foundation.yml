@@ -8,6 +8,7 @@ on:
       - feat/saa-mongodb-auth
       - feat/saa-mongodb-user-audit
       - feat/saa-mongodb-replica-set
+      - feat/saa-mongodb-school-directory
   pull_request:
     branches:
       - main
@@ -57,6 +58,8 @@ jobs:
           php -l src/Database/HealthCheck.php
           php -l src/Database/MongoUserAuthenticator.php
           php -l src/Database/MongoOperationLogWriter.php
+          php -l src/Database/MongoSchoolDirectory.php
+          php -l tests/Integration/Database/MongoSchoolDirectoryTest.php
           php -l tests/Integration/Database/MongoTransactionTest.php
           php -l bin/init_mongodb.php
           php -l bin/create_initial_admin_mongodb.php
@@ -90,6 +93,8 @@ jobs:
           curl --retry 8 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8765/login > /dev/null
           python3 tests/Integration/staff_web.py
           php -r 'require "vendor/autoload.php"; $db=Saa\Database\Mongo::database(); $u=$db->users->findOne(["email"=>"aoe@example.org"]); $a=$db->users->findOne(["email"=>"coord@example.org"]); exit($u && $a && $db->operation_logs->countDocuments(["action"=>"USUARIO_CRIADO","user_id"=>$a["_id"],"entity_id"=>(string)$u["_id"]])===1 && !$db->users->findOne(["email"=>"denied@example.org"]) ? 0 : 1);'
+      - name: Validate MongoDB school directory
+        run: php tests/Integration/Database/MongoSchoolDirectoryTest.php
       - name: Stop MongoDB replica set
         if: always()
         run: docker rm -f saa-mongodb || true

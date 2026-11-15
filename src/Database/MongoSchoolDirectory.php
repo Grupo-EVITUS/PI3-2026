@@ -160,9 +160,20 @@ final class MongoSchoolDirectory
             if ($result->getMatchedCount() !== 1) {
                 throw new InvalidArgumentException('Responsável não encontrado ou inativo.');
             }
+            $linkedStudentIds = [];
+            foreach ($this->database->student_guardians->find(
+                ['guardian_id' => $guardianId], ['projection' => ['student_id' => 1], 'session' => $session]
+            ) as $link) {
+                $linkedStudentIds[] = $link['student_id'];
+            }
             $activeStudentIds = [];
-            foreach ($this->database->students->find(['active' => true], ['projection' => ['_id' => 1], 'session' => $session]) as $student) {
-                $activeStudentIds[] = $student['_id'];
+            if ($linkedStudentIds !== []) {
+                foreach ($this->database->students->find(
+                    ['_id' => ['$in' => $linkedStudentIds], 'active' => true],
+                    ['projection' => ['_id' => 1], 'session' => $session]
+                ) as $student) {
+                    $activeStudentIds[] = $student['_id'];
+                }
             }
             if ($activeStudentIds !== []) {
                 $this->database->student_guardians->deleteMany(

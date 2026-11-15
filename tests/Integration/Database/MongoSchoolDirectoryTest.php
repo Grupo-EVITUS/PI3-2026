@@ -90,6 +90,36 @@ try {
         'responsavel@example.org', 'Pai', []);
     checkDirectory($database->student_guardians->countDocuments(['guardian_id' => $secondGuardian, 'student_id' => $studentId]) === 1,
         'Editar responsável deve preservar vínculo histórico com aluno arquivado.');
+    $raceClass = $directory->createClass($actor, 'Turma concorrente', '5º ano', 2026, 'Manhã');
+    $archiveSession = Mongo::client()->startSession();
+    try {
+        $archiveSession->startTransaction();
+        checkDirectory($database->students->countDocuments(
+            ['class_id' => $raceClass, 'active' => true], ['session' => $archiveSession]
+        ) === 0, 'Snapshot de arquivamento deve começar sem alunos.');
+        $raceStudent = $directory->createStudent($actor, 'Aluno simultâneo', 'RACE-1', $raceClass);
+        $conflict = false;
+        try {
+            $database->classes->updateOne(
+                ['_id' => $raceClass, 'active' => true], ['$set' => ['active' => false]],
+                ['session' => $archiveSession]
+            );
+        } catch (Throwable $error) {
+            $conflict = $error->getCode() === 112
+                || (method_exists($error, 'hasErrorLabel') && $error->hasErrorLabel('TransientTransactionError'));
+        }
+        checkDirectory($conflict, 'Arquivamento com snapshot antigo deve sofrer conflito de escrita.');
+    } finally {
+        try {
+            $archiveSession->abortTransaction();
+        } catch (Throwable) {
+            // O servidor pode já ter abortado a transação ao detectar o conflito.
+        }
+        $archiveSession->endSession();
+    }
+    checkDirectory($database->classes->countDocuments(['_id' => $raceClass, 'active' => true]) === 1
+        && $database->students->countDocuments(['_id' => $raceStudent, 'class_id' => $raceClass]) === 1,
+        'Disputa deve preservar turma ativa com o novo aluno.');
     fwrite(STDOUT, "MongoSchoolDirectoryTest: cadastros, vínculos e autorização passaram.\n");
 } finally {
     $database->drop();

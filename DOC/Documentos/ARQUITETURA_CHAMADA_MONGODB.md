@@ -26,6 +26,13 @@ O teste HTTP/SMTP com Mailpit é o gate desta entrega. A entrega SMTP segue
 semântica ao menos uma vez se houver queda entre aceitação pelo servidor e
 confirmação no banco. O cutover operacional continua separado.
 
+O primeiro gate da migração histórica é `bin/prepare_sqlite_migration.php`:
+produz cópia SQLite consistente (`VACUUM INTO`) e manifesto sem dados pessoais,
+com hash SHA-256, contagens, integridade, referências e estados da fila. O
+comando não grava no MongoDB. A próxima entrega deve importar a cópia aprovada,
+colocar e-mails antigos em quarentena e reconciliar contagens/vínculos; nenhum
+status de presença anterior às chamadas existentes pode ser presumido.
+
 ## Diretriz de integração
 
 A aplicação executável na `main` usa PHP e SQLite; a branch `feat/php-mongodb` contém um rewrite PHP + MongoDB divergente e ainda registra ausências individuais. A PR #55 implementa chamada completa em SQLite. Ambas são referências para port seletivo; nenhuma será mesclada integralmente. A implementação trabalha na branch nova baseada na main atual, preservando os commits recentes de histórico, snapshot de turma e integridade.

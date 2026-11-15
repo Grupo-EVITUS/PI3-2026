@@ -1,29 +1,30 @@
 # Chamada completa do SAA em MongoDB
 
-**Status:** desenho de implementação revisado  
-**Branch de trabalho:** `feat/saa-mongodb-complete-attendance`  
+**Status:** implementação em homologação; migração e cutover pendentes
 **Issue:** #46
 
 **Contrato de persistência:** `attendance_sessions` já possui validação de BSON,
 índice único por `class_id`/`attendance_date` e índice de consulta por data/status.
 `absences.attendance_session_id` é opcional para preservar ocorrências legadas.
-Esse contrato preserva a compatibilidade de ocorrências legadas; justificativas
-e envio de e-mail Mongo ainda não estão conectados.
+Esse contrato preserva a compatibilidade de ocorrências legadas.
 
 O serviço `MongoAttendance::record` registra, em uma transação no replica set,
 o roster completo, ausências, auditoria, comunicações e e-mails na fila. Ele
 rejeita chamadas repetidas e alterações concorrentes de turma/aluno/vínculo.
-Ainda não há processador SMTP Mongo: a fila criada pelo serviço não é enviada
-automaticamente nesta etapa. O modo SQLite continua atendendo o fluxo
-completo até o cutover ensaiado.
+A gravação não envia SMTP dentro da requisição; o worker separado processa a
+fila. O modo SQLite continua atendendo o fluxo operacional até o cutover ensaiado.
 
 A rota `/chamada` existe apenas para homologação quando
 `SAA_WEB_MODE=mongo_staff` e `SAA_MONGO_ATTENDANCE_PREVIEW=true` são configurados
 explicitamente. Ela autentica AOE/Coordenação, revalida a conta ativa, exige
 CSRF e usa o serviço transacional. O padrão continua desligado. A interface
-avisa que o e-mail fica na fila e que o link de justificativa ainda não
-funciona; não habilitar essa opção como fluxo operacional até SMTP e
-justificativa Mongo serem testados de ponta a ponta.
+avisa que a comunicação fica na fila até o worker SMTP processá-la. O worker
+`bin/process_mail_queue_mongodb.php` requer `MAIL_MODE=smtp`; recupera reservas
+antigas e ignora filas em quarentena. Após SMTP, o link individual é validado
+pela rota pública `/justificar/{token}` e grava a resposta em transação.
+O teste HTTP/SMTP com Mailpit é o gate desta entrega. A entrega SMTP segue
+semântica ao menos uma vez se houver queda entre aceitação pelo servidor e
+confirmação no banco. O cutover operacional continua separado.
 
 ## Diretriz de integração
 

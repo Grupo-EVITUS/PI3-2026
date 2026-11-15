@@ -27,6 +27,10 @@ jobs:
           extensions: pdo_sqlite, mbstring
       - name: Registrar ausência, receber e-mail e justificar por HTTP
         run: |
+          php -l src/Migration/SQLiteSnapshot.php
+          php -l bin/prepare_sqlite_migration.php
+          php -l tests/Integration/Database/SQLiteSnapshotTest.php
+          php tests/Integration/Database/SQLiteSnapshotTest.php
           php -S 127.0.0.1:8765 router.php >/tmp/saa-web.log 2>&1 &
           server=$!
           trap 'kill "$server"' EXIT

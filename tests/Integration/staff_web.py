@@ -62,3 +62,21 @@ status, result = request(coord, "/cadastros/responsavel", {
 assert status == 200 and "Responsável CI" in result
 assert request(aoe, "/cadastros/turma", dict(
     name="Negada", grade="5º ano", academic_year="2026", shift="Tarde", csrf_token=csrf(page)))[0] == 403
+
+status, result = request(coord, "/cadastros/aluno", {
+    "id": student_id, "name": "Aluno CI Atualizado", "registration_no": "CI-001",
+    "class_id": class_id, "csrf_token": csrf(result),
+})
+assert status == 200 and "Aluno CI Atualizado" in result
+status, result = request(coord, "/cadastros/arquivar", {
+    "id": class_id, "entity": "turma", "csrf_token": csrf(result),
+})
+assert status == 422 and "alunos ativos" in result
+status, result = request(coord, "/cadastros/arquivar", {
+    "id": student_id, "entity": "aluno", "csrf_token": csrf(result),
+})
+assert status == 200 and "Aluno CI Atualizado" not in result
+status, result = request(coord, "/cadastros/arquivar", {
+    "id": class_id, "entity": "turma", "csrf_token": csrf(result),
+})
+assert status == 200 and "5º ano A" not in result

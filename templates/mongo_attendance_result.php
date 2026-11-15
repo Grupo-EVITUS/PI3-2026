@@ -11,7 +11,8 @@
 </section>
 <div class="notice notice-warning" role="status">
     <?= (int)$result['notifications'] ?> comunicação(ões) aguardam na fila MongoDB.
-    <strong>Não houve envio de e-mail.</strong> O envio e a justificativa ainda não foram ativados neste modo.
+    <strong>O registro não envia e-mail diretamente.</strong> O worker SMTP processará a fila;
+    o link de justificativa funcionará após o envio.
 </div>
 <?php if ($result['without_guardians']): ?>
     <div class="notice notice-warning">Sem responsável ativo para: <?= e(implode(', ', $result['without_guardians'])) ?>.</div>

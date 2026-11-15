@@ -151,6 +151,40 @@ try {
         && $database->student_guardians->countDocuments(
             ['student_id' => $raceStudent, 'guardian_id' => $raceGuardian]
         ) === 1, 'Disputa deve manter aluno ativo e vínculo confirmado.');
+    $removeLinkSession = Mongo::client()->startSession();
+    try {
+        $removeLinkSession->startTransaction();
+        checkDirectory($database->student_guardians->countDocuments(
+            ['student_id' => $raceStudent, 'guardian_id' => $raceGuardian],
+            ['session' => $removeLinkSession]
+        ) === 1, 'Vínculo deve existir antes da disputa.');
+        checkDirectory($database->students->countDocuments(
+            ['_id' => $raceStudent, 'active' => true], ['session' => $removeLinkSession]
+        ) === 1, 'Snapshot da remoção deve ver aluno ativo.');
+        $directory->archive($actor, 'aluno', $raceStudent);
+        $conflict = false;
+        try {
+            $database->students->updateOne(
+                ['_id' => $raceStudent, 'active' => true], ['$inc' => ['link_revision' => 1]],
+                ['session' => $removeLinkSession]
+            );
+        } catch (Throwable $error) {
+            $conflict = $error->getCode() === 112
+                || (method_exists($error, 'hasErrorLabel') && $error->hasErrorLabel('TransientTransactionError'));
+        }
+        checkDirectory($conflict, 'Remoção de vínculo com snapshot antigo deve sofrer conflito.');
+    } finally {
+        try {
+            $removeLinkSession->abortTransaction();
+        } catch (Throwable) {
+        }
+        $removeLinkSession->endSession();
+    }
+    $directory->updateGuardian($actor, $raceGuardian, 'Responsável simultâneo',
+        'simultaneo@example.org', 'Pai', []);
+    checkDirectory($database->student_guardians->countDocuments(
+        ['student_id' => $raceStudent, 'guardian_id' => $raceGuardian]
+    ) === 1, 'Editar responsável não pode apagar vínculo histórico com aluno arquivado.');
     fwrite(STDOUT, "MongoSchoolDirectoryTest: cadastros, vínculos e autorização passaram.\n");
 } finally {
     $database->drop();

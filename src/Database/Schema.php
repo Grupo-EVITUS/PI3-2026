@@ -52,9 +52,36 @@ final class Schema
             Collections::STUDENT_GUARDIANS => $schema(
                 ['student_id', 'guardian_id'], ['student_id' => $id, 'guardian_id' => $id]
             ),
+            Collections::ATTENDANCE_SESSIONS => $schema(
+                ['class_id', 'attendance_date', 'completed_by', 'completed_at', 'class_name', 'academic_year',
+                 'class_shift', 'entries', 'roster_hash', 'status'],
+                [
+                    'class_id' => $id,
+                    'attendance_date' => ['bsonType' => 'string', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
+                    'completed_by' => $id, 'completed_at' => $date,
+                    'class_name' => $text,
+                    'academic_year' => ['bsonType' => ['int', 'long']],
+                    'class_shift' => $enum(['Manhã', 'Tarde', 'Noite', 'Integral']),
+                    'entries' => [
+                        'bsonType' => 'array', 'minItems' => 1,
+                        'items' => [
+                            'bsonType' => 'object',
+                            'required' => ['student_id', 'student_name', 'status'],
+                            'properties' => [
+                                'student_id' => $id, 'student_name' => $text,
+                                'registration_no' => ['bsonType' => ['string', 'null']],
+                                'status' => $enum(['PRESENTE', 'AUSENTE']),
+                            ],
+                        ],
+                    ],
+                    'roster_hash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
+                    'status' => $enum(['PROCESSANDO', 'CONCLUIDA']),
+                ]
+            ),
             Collections::ABSENCES => $schema(
                 ['student_id', 'absence_date', 'status', 'registered_by', 'created_at'],
                 ['student_id' => $id, 'class_id' => $nullableId,
+                 'attendance_session_id' => $nullableId,
                  'absence_date' => ['bsonType' => 'string', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
                  'status' => $enum(['PENDENTE', 'RESPONDIDA']), 'registered_by' => $id, 'created_at' => $date,
                  'class_snapshot_source' => $enum(['captured', 'legacy_backfill', 'unknown'])]
@@ -104,8 +131,14 @@ final class Schema
                 ['key' => ['student_id' => 1, 'guardian_id' => 1], 'name' => 'student_guardian_unique', 'unique' => true],
                 ['key' => ['guardian_id' => 1], 'name' => 'links_guardian'],
             ],
+            Collections::ATTENDANCE_SESSIONS => [
+                ['key' => ['class_id' => 1, 'attendance_date' => 1], 'name' => 'attendance_class_day_unique', 'unique' => true],
+                ['key' => ['attendance_date' => -1, 'status' => 1], 'name' => 'attendance_date_status'],
+            ],
             Collections::ABSENCES => [
                 ['key' => ['student_id' => 1, 'absence_date' => 1], 'name' => 'absence_student_day_unique', 'unique' => true],
+                ['key' => ['attendance_session_id' => 1, 'student_id' => 1], 'name' => 'absence_session_student_unique',
+                 'unique' => true, 'partialFilterExpression' => ['attendance_session_id' => ['$type' => 'objectId']]],
                 ['key' => ['status' => 1, 'absence_date' => -1], 'name' => 'absence_status_date'],
                 ['key' => ['class_id' => 1, 'absence_date' => -1], 'name' => 'absence_class_date'],
             ],

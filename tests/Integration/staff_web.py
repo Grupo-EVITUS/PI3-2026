@@ -45,3 +45,20 @@ aoe = browser()
 status, page = login(aoe, fields["email"])
 assert status == 403
 assert request(aoe, "/cadastros/usuario", dict(fields, email="denied@example.org", csrf_token=csrf(page)))[0] == 403
+
+assert 'action="/cadastros/turma"' in result
+status, result = request(coord, "/cadastros/turma", dict(
+    name="5º ano A", grade="5º ano", academic_year="2026", shift="Manhã", csrf_token=csrf(result)))
+assert status == 200 and "5º ano A" in result
+class_id = re.search(r'<option value="([a-f0-9]{24})">5º ano A</option>', result)[1]
+status, result = request(coord, "/cadastros/aluno", dict(
+    name="Aluno CI", registration_no="CI-001", class_id=class_id, csrf_token=csrf(result)))
+assert status == 200 and "Aluno CI" in result
+student_id = re.search(r'name="student_ids\\[\\]" value="([a-f0-9]{24})"> Aluno CI', result)[1]
+status, result = request(coord, "/cadastros/responsavel", {
+    "name": "Responsável CI", "email": "guardian@example.org", "relationship": "Mãe",
+    "student_ids[]": student_id, "csrf_token": csrf(result),
+})
+assert status == 200 and "Responsável CI" in result
+assert request(aoe, "/cadastros/turma", dict(
+    name="Negada", grade="5º ano", academic_year="2026", shift="Tarde", csrf_token=csrf(page)))[0] == 403

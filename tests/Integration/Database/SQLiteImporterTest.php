@@ -15,6 +15,7 @@ $source = $directory . '/source.sqlite3';
 $snapshot = $directory . '/snapshot.sqlite3';
 $manifest = $directory . '/manifest.json';
 $db = Mongo::database('saa_import_test_' . bin2hex(random_bytes(8)));
+$restored = Mongo::database('saa_restore_test_' . bin2hex(random_bytes(8)));
 try {
     putenv('DATABASE_PATH=' . $source);
     putenv('SEED_DEMO=true');
@@ -66,9 +67,30 @@ try {
         static function (): void { throw new RuntimeException('Mensagem histórica não pode ser enviada.'); }
     );
     if ($processed !== 0) { throw new RuntimeException('Fila histórica saiu da quarentena.'); }
-    fwrite(STDOUT, "SQLiteImporterTest: dry-run, retomada, histórico e quarentena passaram.\n");
+
+    // Ensaio de restauração: a mesma cópia reconstrói um banco novo com os mesmos IDs e vínculos.
+    $restoreCounts = (new SQLiteImporter($snapshot, $manifest, $restored))->run(true);
+    if ($restoreCounts !== $counts) {
+        throw new RuntimeException('Contagens divergentes após restauração.');
+    }
+    foreach (Saa\Database\Collections::legacyImport() as $collection) {
+        $original = $db->selectCollection($collection)->find([], ['sort' => ['_id' => 1]])->toArray();
+        $copy = $restored->selectCollection($collection)->find([], ['sort' => ['_id' => 1]])->toArray();
+        if (json_encode($original, JSON_THROW_ON_ERROR) !== json_encode($copy, JSON_THROW_ON_ERROR)) {
+            throw new RuntimeException('Restauração divergente: ' . $collection);
+        }
+    }
+    if ($restored->attendance_sessions->countDocuments() !== 0
+        || $restored->mail_queue->countDocuments(['status' => 'AGUARDANDO']) !== 0
+        || (new Saa\Database\MongoMailQueue($restored))->process(
+            static function (): void { throw new RuntimeException('E-mail restaurado não pode ser enviado.'); }
+        ) !== 0) {
+        throw new RuntimeException('Restauração reativou a fila ou criou chamada canônica.');
+    }
+    fwrite(STDOUT, "SQLiteImporterTest: dry-run, retomada, histórico, restauração e quarentena passaram.\n");
 } finally {
     $db->drop();
+    $restored->drop();
     foreach (glob($directory . '/*') ?: [] as $file) { unlink($file); }
     rmdir($directory);
 }

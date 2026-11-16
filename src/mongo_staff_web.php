@@ -257,7 +257,7 @@ if ($path === '/comunicacoes/reenvio') {
         Auth::redirect($original === null ? '/ocorrencias' : '/ausencias/' . $original['absence_id']);
     }
 }
-if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
+if ($path === '/chamada') {
     Auth::requireRole(['AOE', 'COORDENACAO']);
     if ($method === 'GET') {
         renderMongoAttendance();

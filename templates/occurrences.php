@@ -1,16 +1,12 @@
-<?php
-$pageTitle = 'Ocorrências';
-$registerPath = getenv('SAA_WEB_MODE') !== 'mongo_staff' ? '/ausencias/registrar'
-    : (mongoAttendancePreviewEnabled() ? '/chamada' : null);
-?>
+<?php $pageTitle = 'Ocorrências'; ?>
 <section class="page-heading">
     <div>
         <span class="eyebrow">Acompanhamento</span>
         <h1>Ocorrências de ausência</h1>
         <p>Consulte o andamento das comunicações e as justificativas enviadas.</p>
     </div>
-    <?php if ($registerPath !== null && in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
-        <a class="button button-primary" href="<?= e($registerPath) ?>">Registrar ausência <span aria-hidden="true">+</span></a>
+    <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
+        <a class="button button-primary" href="/chamada">Fazer chamada <span aria-hidden="true">+</span></a>
     <?php endif; ?>
 </section>
 

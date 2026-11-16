@@ -91,7 +91,7 @@ status, result = request(coord, "/cadastros/arquivar", {
 })
 assert status == 200 and "5º ano A" not in result
 
-# A rota Mongo de chamada fica disponível apenas no modo de homologação da CI.
+# Chamada: lista completa da turma, uma única vez por dia.
 status, result = request(coord, "/cadastros/turma", dict(
     name="Turma Chamada CI", grade="6º ano", academic_year="2026", shift="Tarde", csrf_token=csrf(result)))
 assert status == 200
@@ -109,7 +109,8 @@ assert status == 200
 guest_status, guest_page = request(browser(), "/chamada")
 assert guest_status == 200 and 'action="/login"' in guest_page
 status, attendance_page = request(aoe, "/chamada?turma_id=" + attendance_class)
-assert status == 200 and "O envio depende da execução do worker SMTP" in attendance_page
+assert status == 200 and "Os responsáveis dos ausentes recebem o aviso" in attendance_page
+assert "homologação" not in attendance_page.lower()
 student_ids = re.findall(r'name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', attendance_page)
 assert len(student_ids) == 2 and first_id in student_ids
 partial = {"class_id": attendance_class, "absence_date": "2026-11-15",

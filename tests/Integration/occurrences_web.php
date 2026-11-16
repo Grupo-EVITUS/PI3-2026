@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Percurso HTTP das telas de acompanhamento no modo MongoDB (SAA_WEB_MODE=mongo_staff):
+ * Percurso HTTP das telas de acompanhamento:
  * lista de ocorrências com filtros, detalhe da ausência, reenvio de comunicação com falha e permissões.
  * A falha de entrega é simulada direto no banco, como o worker de e-mail a registraria.
  */

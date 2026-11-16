@@ -221,3 +221,21 @@ tbody tr:last-child td { border-bottom: 0; }
     td::before { content: attr(data-label); color: #839194; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
     td[data-label="Aluno"] { padding-top: 11px; }
 }
+
+/* Notificações push (PWA) */
+.push-panel { display: flex; gap: 16px; max-width: 620px; margin: 22px auto 0; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--mint); }
+.public-card .push-panel { margin: 0 0 16px; }
+.push-panel-icon { flex: none; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 14px; background: var(--paper); font-size: 22px; }
+.push-panel-text h2 { margin: 0 0 6px; font-size: 17px; }
+.push-panel-text p { margin: 0 0 12px; }
+.push-status:empty { display: none; }
+.push-status { font-weight: 600; }
+.push-status[data-kind="success"] { color: var(--green); }
+.push-status[data-kind="error"] { color: var(--red); }
+.push-help summary { cursor: pointer; color: var(--teal); font-weight: 600; }
+.push-help ol { padding-left: 20px; margin: 10px 0; }
+.push-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--muted); background: var(--canvas); }
+.push-badge-on { color: var(--green); background: var(--green-bg); }
+.invite-link { display: grid; gap: 6px; font-weight: 600; }
+.invite-link input { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 10px; font-family: ui-monospace, monospace; font-size: 13px; }
+@media (max-width: 600px) { .push-panel { flex-direction: column; padding: 18px; } }

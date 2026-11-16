@@ -25,6 +25,11 @@ final class Collections
     public const LEGACY_ATTENDANCE_SESSIONS = 'legacy_attendance_sessions';
     public const LEGACY_ATTENDANCE_RECORDS = 'legacy_attendance_records';
 
+    // Notificação push (PWA): aparelhos inscritos, convites de ativação e fila de entrega.
+    public const PUSH_SUBSCRIPTIONS = 'push_subscriptions';
+    public const PUSH_INVITES = 'push_invites';
+    public const PUSH_QUEUE = 'push_queue';
+
     /** @return list<string> */
     public static function legacyImport(): array
     {

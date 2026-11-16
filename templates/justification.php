@@ -39,3 +39,4 @@
         </form>
     <?php endif; ?>
 </section>
+<?php if (isset($pushPanel)) { require __DIR__ . '/push_panel.php'; } ?>

@@ -115,7 +115,7 @@ status, invalid = request(aoe, "/chamada", partial)
 assert status == 422 and "todos os alunos ativos" in invalid
 full = dict(partial, **{"attendance[" + next(x for x in student_ids if x != first_id) + "]": "PRESENTE"})
 status, summary = request(aoe, "/chamada", full)
-assert status == 200 and "Chamada registrada" in summary and "não envia e-mail diretamente" in summary
+assert status == 200 and "Chamada registrada" in summary and "não envia avisos diretamente" in summary and "0 por notificação push" in summary
 assert "1 comunicação(ões) aguardam" in summary
 status, duplicate = request(aoe, "/chamada", full)
 assert status == 422 and "Já existe uma chamada" in duplicate

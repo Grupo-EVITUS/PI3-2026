@@ -16,7 +16,7 @@ use Saa\Push\WebPush;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
-// Painel de ocorrências, detalhe da ausência e reenvio de comunicação que falhou (substitui as telas SQLite).
+// Painel de ocorrências, detalhe da ausência e reenvio de comunicação que falhou.
 function occurrenceAssert(bool $ok, string $message): void
 {
     if (!$ok) {

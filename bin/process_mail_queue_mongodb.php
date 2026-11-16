@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
-require dirname(__DIR__) . '/src/MailQueue.php';
+require dirname(__DIR__) . '/src/Mailer.php';
 
 if (strtolower(getenv('MAIL_MODE') ?: '') !== 'smtp') {
     fwrite(STDERR, "Configure MAIL_MODE=smtp para o worker de e-mail.\n");

@@ -213,7 +213,7 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
         }
     }
     render('justification.php', [
-        'absence' => $absence, 'error' => $error, 'reasons' => Services::REASONS,
+        'absence' => $absence, 'error' => $error, 'reasons' => MongoJustification::REASONS,
         'pushPanel' => pushPanel('/justificar/' . $token . '/notificacoes'),
         'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
         'explanation' => is_string($explanation) ? $explanation : '',
@@ -235,7 +235,7 @@ if (preg_match('#^/ausencias/([a-f0-9]{24})$#', $path, $matches)) {
     if ($detail === null) {
         notFound();
     }
-    render('absence_detail.php', $detail + ['reasons' => Services::REASONS]);
+    render('absence_detail.php', $detail + ['reasons' => MongoJustification::REASONS]);
     return;
 }
 if ($path === '/comunicacoes/reenvio') {

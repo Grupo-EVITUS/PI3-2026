@@ -1,83 +1,8 @@
 <?php
 declare(strict_types=1);
 
-function processMailQueue(PDO $pdo, int $limit = 20): int
-{
-    $processed = 0;
-    $staleBefore = gmdate('Y-m-d\TH:i:s\Z', time() - 300);
-    $recover = $pdo->prepare(
-        "UPDATE mail_queue SET status = 'AGUARDANDO', started_at = NULL "
-        . "WHERE status = 'PROCESSANDO' AND started_at < ?"
-    );
-    $recover->execute([$staleBefore]);
-    for ($index = 0; $index < $limit; $index++) {
-        $pdo->beginTransaction();
-        try {
-            $job = $pdo->query(
-                "SELECT q.*, c.id AS communication_id FROM mail_queue q "
-                . "JOIN communications c ON c.id = q.communication_id "
-                . "WHERE q.status = 'AGUARDANDO' ORDER BY q.id LIMIT 1"
-            )->fetch();
-            if (!$job) {
-                $pdo->commit();
-                break;
-            }
-            $claim = $pdo->prepare(
-                "UPDATE mail_queue SET status = 'PROCESSANDO', started_at = ? WHERE id = ? AND status = 'AGUARDANDO'"
-            );
-            $claim->execute([Database::now(), (int)$job['id']]);
-            if ($claim->rowCount() !== 1) {
-                $pdo->commit();
-                continue;
-            }
-            $pdo->commit();
-
-            try {
-                sendQueuedEmail($job);
-                $status = 'ENVIADO';
-                $queueStatus = 'CONCLUIDO';
-                $detail = '';
-            } catch (Throwable $error) {
-                $status = 'FALHA';
-                $queueStatus = 'FALHA';
-                $detail = substr($error->getMessage(), 0, 500);
-                error_log('Falha ao enviar comunicação ' . $job['communication_id'] . ': ' . $detail);
-            }
-
-            $pdo->beginTransaction();
-            $updateCommunication = $pdo->prepare(
-                'UPDATE communications SET status = ?, sent_at = ?, failure_detail = ? WHERE id = ?'
-            );
-            $updateCommunication->execute([
-                $status,
-                $status === 'ENVIADO' ? Database::now() : null,
-                $detail !== '' ? $detail : null,
-                (int)$job['communication_id'],
-            ]);
-            $updateJob = $pdo->prepare(
-                'UPDATE mail_queue SET status = ?, processed_at = ?, started_at = NULL WHERE id = ?'
-            );
-            $updateJob->execute([$queueStatus, Database::now(), (int)$job['id']]);
-            $pdo->prepare('UPDATE mail_queue SET body = ? WHERE id = ?')->execute(['', (int)$job['id']]);
-            audit(
-                $pdo,
-                null,
-                'EMAIL_' . $status,
-                'comunicacao',
-                (int)$job['communication_id'],
-                $detail !== '' ? $detail : $job['recipient']
-            );
-            $pdo->commit();
-            $processed++;
-        } catch (Throwable $error) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            throw $error;
-        }
-    }
-    return $processed;
-}
+// Envio de e-mail usado pelo worker da fila MongoDB (bin/process_mail_queue_mongodb.php).
+// MAIL_MODE=log só registra no log do PHP; MAIL_MODE=smtp entrega pelo servidor configurado em SMTP_*.
 
 function sendQueuedEmail(array $job): void
 {

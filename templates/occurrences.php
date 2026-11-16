@@ -38,7 +38,7 @@
                         </td>
                         <td data-label="Justificativa">
                             <?php if ($row['reason']): ?>
-                                <?= e(Services::REASONS[$row['reason']] ?? $row['reason']) ?>
+                                <?= e(\Saa\Database\MongoJustification::REASONS[$row['reason']] ?? $row['reason']) ?>
                                 <?php if ($row['reason'] === 'OUTRO' && $row['explanation']): ?><small class="subline"><?= e($row['explanation']) ?></small><?php endif; ?>
                             <?php else: ?><span class="muted">Aguardando</span><?php endif; ?>
                         </td>

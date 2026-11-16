@@ -42,14 +42,6 @@ function requirePost(): void
     Auth::validateCsrf();
 }
 
-function audit(PDO $pdo, ?int $userId, string $action, string $entity, ?int $entityId, string $details = ''): void
-{
-    $statement = $pdo->prepare(
-        'INSERT INTO operation_logs (user_id, action, entity, entity_id, details, happened_at) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    $statement->execute([$userId, $action, $entity, $entityId, $details, Database::now()]);
-}
-
 function baseUrl(string $path = ''): string
 {
     $configured = rtrim(getenv('PUBLIC_BASE_URL') ?: '', '/');

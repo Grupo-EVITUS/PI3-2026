@@ -15,4 +15,3 @@ session_start();
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
-require_once __DIR__ . '/Services.php';

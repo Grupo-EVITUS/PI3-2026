@@ -1,7 +1,7 @@
 <?php $pageTitle = 'Detalhes da ausência'; ?>
 <section class="page-heading">
     <div>
-        <span class="eyebrow">Ocorrência #<?= (int)$absence['id'] ?></span>
+        <span class="eyebrow">Ocorrência de ausência</span>
         <h1><?= e($absence['student_name']) ?></h1>
         <p><?= e($absence['class_name']) ?> · <?= e($absence['grade']) ?> · ausência em <?= e(date('d/m/Y', strtotime($absence['absence_date']))) ?></p>
     </div>
@@ -22,14 +22,18 @@
                     <article class="result-row">
                         <div>
                             <strong><?= e($communication['guardian_name']) ?></strong>
-                            <small><?= e($communication['email_to']) ?></small>
+                            <small>
+                                <?= ($communication['channel'] ?? 'EMAIL') === 'PUSH' ? 'Notificação no celular' : 'E-mail' ?>
+                                · <?= e($communication['email_to']) ?>
+                                <?php if (!empty($communication['is_retry'])): ?> · reenvio<?php endif; ?>
+                            </small>
                             <?php if ($communication['failure_detail']): ?><small class="error-text"><?= e($communication['failure_detail']) ?></small><?php endif; ?>
                         </div>
                         <span class="status status-<?= e(strtolower($communication['status'])) ?>"><?= e(ucfirst(strtolower($communication['status']))) ?></span>
-                        <?php if ($communication['status'] === 'FALHA' && in_array($_SESSION['profile'], ['AOE', 'COORDENACAO'], true)): ?>
+                        <?php if ($communication['status'] === 'FALHA' && ($communication['can_retry'] ?? true) && in_array($_SESSION['profile'], ['AOE', 'COORDENACAO'], true)): ?>
                             <form method="post" action="/comunicacoes/reenvio">
                                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                                <input type="hidden" name="communication_id" value="<?= (int)$communication['id'] ?>">
+                                <input type="hidden" name="communication_id" value="<?= e((string)$communication['id']) ?>">
                                 <button class="button button-small button-outline" type="submit">Reenviar</button>
                             </form>
                         <?php endif; ?>

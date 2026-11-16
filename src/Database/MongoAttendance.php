@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Saa\Database;
 
-use DateTimeImmutable;
 use DomainException;
 use InvalidArgumentException;
 use MongoDB\BSON\ObjectId;
@@ -34,14 +33,7 @@ final class MongoAttendance
         if (!Bson::isDay($attendanceDate)) {
             throw new InvalidArgumentException('Informe uma data válida.');
         }
-        $parts = parse_url($baseUrl);
-        if (!is_array($parts) || !in_array($parts['scheme'] ?? null, ['http', 'https'], true)
-            || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])
-            || isset($parts['query']) || isset($parts['fragment']) || strlen($baseUrl) > 300
-            || preg_match('/[\x00-\x1f\x7f]/', $baseUrl) === 1) {
-            throw new InvalidArgumentException('Endereço público do sistema inválido.');
-        }
-        $baseUrl = rtrim($baseUrl, '/');
+        $baseUrl = MongoAbsenceNotice::baseUrl($baseUrl);
         if ($studentStatuses === [] || count($studentStatuses) > 1000) {
             throw new InvalidArgumentException('Informe a chamada completa de até 1000 alunos.');
         }
@@ -162,46 +154,9 @@ final class MongoAttendance
                         )->getMatchedCount() !== 1) {
                             throw new InvalidArgumentException('Responsável alterado durante a chamada.');
                         }
-                        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-                        $communicationId = new ObjectId();
-                        $usePush = $this->database->push_subscriptions->countDocuments(
-                            ['guardian_id' => $guardian['_id'], 'active' => true], $options
-                        ) > 0;
-                        $this->database->communications->insertOne([
-                            '_id' => $communicationId, 'absence_id' => $absenceId, 'guardian_id' => $guardian['_id'],
-                            'email_to' => $guardian['email'], 'token_hash' => hash('sha256', $token),
-                            'status' => 'PENDENTE', 'created_at' => $now, 'channel' => $usePush ? 'PUSH' : 'EMAIL',
-                        ], $options);
-                        $day = (new DateTimeImmutable($attendanceDate))->format('d/m/Y');
-                        $path = '/justificar/' . rawurlencode($token);
-                        $email = [
-                            'recipient' => $guardian['email'],
-                            'subject' => 'Comunicado de ausência — ' . $entry['student_name'],
-                            'body' => 'Olá, ' . $guardian['name'] . ".\n\n"
-                                . 'Informamos que ' . $entry['student_name'] . ' não compareceu à turma '
-                                . $class['name'] . ' em ' . $day
-                                . ".\n\nPara enviar a justificativa, acesse o link individual:\n"
-                                . $baseUrl . $path
-                                . "\n\nAtenciosamente,\nEquipe escolar",
-                        ];
-                        if ($usePush) {
-                            // O e-mail fica guardado e só entra na fila se o push não for entregue.
-                            $this->database->push_queue->insertOne([
-                                '_id' => new ObjectId(), 'communication_id' => $communicationId,
-                                'guardian_id' => $guardian['_id'],
-                                'title' => 'Ausência de ' . $entry['student_name'],
-                                'body' => $entry['student_name'] . ' não compareceu à turma ' . $class['name']
-                                    . ' em ' . $day . '. Toque para enviar a justificativa.',
-                                'url' => $path, 'fallback_email' => $email,
-                                'status' => 'AGUARDANDO', 'created_at' => $now,
-                            ], $options);
-                            $pushNotifications++;
-                        } else {
-                            $this->database->mail_queue->insertOne([
-                                '_id' => new ObjectId(), 'communication_id' => $communicationId,
-                                'status' => 'AGUARDANDO', 'created_at' => $now,
-                            ] + $email, $options);
-                        }
+                        $channel = MongoAbsenceNotice::queue($this->database, $session, $guardian, $absenceId,
+                            $entry['student_name'], $class['name'], $attendanceDate, $baseUrl, $now);
+                        $pushNotifications += $channel === 'PUSH' ? 1 : 0;
                         $notifications++;
                     }
                 }

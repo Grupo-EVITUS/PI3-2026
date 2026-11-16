@@ -8,6 +8,7 @@ use Saa\Database\MongoStaffRegistration;
 use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\MongoAttendance;
 use Saa\Database\MongoJustification;
+use Saa\Database\MongoOccurrences;
 use Saa\Database\MongoPushSubscriptions;
 use Saa\Push\WebPush;
 use Saa\Database\Bson;
@@ -63,6 +64,20 @@ function renderSchoolDirectory(): void
     $pushDevices = (new MongoPushSubscriptions($database))->activeCounts();
     $pushEnabled = WebPush::configuredPublicKey() !== null;
     render('staff_registration.php', compact('classes', 'students', 'guardians', 'links', 'pushDevices', 'pushEnabled'));
+}
+
+/** Perfil da sessão permitido e usuário ainda ativo no banco (desativação vale na hora). */
+function requireActiveStaff(array $profiles): void
+{
+    Auth::requireRole($profiles);
+    $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+    if ($actor === null || Mongo::database()->users->countDocuments(
+        ['_id' => $actor, 'active' => true, 'profile' => ['$in' => $profiles]]
+    ) !== 1) {
+        http_response_code(403);
+        render('error.php', ['title' => 'Acesso negado', 'message' => 'Seu acesso não está ativo.']);
+        exit;
+    }
 }
 
 /** Dados do painel "ativar notificações" (null quando o servidor não tem chaves VAPID). */
@@ -204,6 +219,43 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
         'explanation' => is_string($explanation) ? $explanation : '',
     ]);
     return;
+}
+if ($path === '/ocorrencias') {
+    requireActiveStaff(['AOE', 'COORDENACAO', 'DIRETOR']);
+    $status = is_string($_GET['status'] ?? null) ? $_GET['status'] : '';
+    $status = in_array($status, ['PENDENTE', 'RESPONDIDA'], true) ? $status : '';
+    render('occurrences.php', [
+        'occurrences' => (new MongoOccurrences(Mongo::database()))->list($status), 'activeStatus' => $status,
+    ]);
+    return;
+}
+if (preg_match('#^/ausencias/([a-f0-9]{24})$#', $path, $matches)) {
+    requireActiveStaff(['AOE', 'COORDENACAO', 'DIRETOR']);
+    $detail = (new MongoOccurrences(Mongo::database()))->detail(new ObjectId($matches[1]));
+    if ($detail === null) {
+        notFound();
+    }
+    render('absence_detail.php', $detail + ['reasons' => Services::REASONS]);
+    return;
+}
+if ($path === '/comunicacoes/reenvio') {
+    requireActiveStaff(['AOE', 'COORDENACAO']);
+    requirePost();
+    $communicationId = Bson::objectId($_POST['communication_id'] ?? null);
+    try {
+        $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+        if ($actor === null || $communicationId === null) {
+            throw new InvalidArgumentException('Comunicação não encontrada.');
+        }
+        $absenceId = (new MongoOccurrences(Mongo::database()))->retry($actor, $communicationId, baseUrl());
+        flash('Novo envio colocado na fila.');
+        Auth::redirect('/ausencias/' . $absenceId);
+    } catch (InvalidArgumentException|DomainException $error) {
+        flash($error->getMessage(), 'error');
+        $original = $communicationId === null ? null
+            : Mongo::database()->communications->findOne(['_id' => $communicationId], ['projection' => ['absence_id' => 1]]);
+        Auth::redirect($original === null ? '/ocorrencias' : '/ausencias/' . $original['absence_id']);
+    }
 }
 if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
     Auth::requireRole(['AOE', 'COORDENACAO']);

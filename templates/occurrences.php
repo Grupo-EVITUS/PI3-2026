@@ -1,12 +1,16 @@
-<?php $pageTitle = 'Ocorrências'; ?>
+<?php
+$pageTitle = 'Ocorrências';
+$registerPath = getenv('SAA_WEB_MODE') !== 'mongo_staff' ? '/ausencias/registrar'
+    : (mongoAttendancePreviewEnabled() ? '/chamada' : null);
+?>
 <section class="page-heading">
     <div>
         <span class="eyebrow">Acompanhamento</span>
         <h1>Ocorrências de ausência</h1>
         <p>Consulte o andamento das comunicações e as justificativas enviadas.</p>
     </div>
-    <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
-        <a class="button button-primary" href="/ausencias/registrar">Registrar ausência <span aria-hidden="true">+</span></a>
+    <?php if ($registerPath !== null && in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
+        <a class="button button-primary" href="<?= e($registerPath) ?>">Registrar ausência <span aria-hidden="true">+</span></a>
     <?php endif; ?>
 </section>
 
@@ -42,7 +46,7 @@
                                 <?php if ($row['reason'] === 'OUTRO' && $row['explanation']): ?><small class="subline"><?= e($row['explanation']) ?></small><?php endif; ?>
                             <?php else: ?><span class="muted">Aguardando</span><?php endif; ?>
                         </td>
-                        <td data-label="Detalhes"><a class="text-link" href="/ausencias/<?= (int)$row['id'] ?>">Ver detalhes <span aria-hidden="true">→</span></a></td>
+                        <td data-label="Detalhes"><a class="text-link" href="/ausencias/<?= e((string)$row['id']) ?>">Ver detalhes <span aria-hidden="true">→</span></a></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

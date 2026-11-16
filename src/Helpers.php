@@ -14,10 +14,7 @@ function mongoAttendancePreviewEnabled(): bool
 
 function staffHomePath(): string
 {
-    if (getenv('SAA_WEB_MODE') !== 'mongo_staff') {
-        return '/ocorrencias';
-    }
-    return ($_SESSION['profile'] ?? '') === 'AOE' && mongoAttendancePreviewEnabled() ? '/chamada' : '/cadastros';
+    return '/ocorrencias';
 }
 
 function render(string $template, array $data = []): void

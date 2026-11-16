@@ -36,6 +36,8 @@ def login(client, email):
 
 coord = browser()
 status, page = login(coord, os.environ["INITIAL_ADMIN_EMAIL"])
+assert status == 200 and "Ocorrências de ausência" in page
+status, page = request(coord, "/cadastros")
 assert status == 200 and 'action="/cadastros/usuario"' in page
 fields = dict(name="Equipe", email="aoe@example.org", profile="AOE", password=password)
 assert request(coord, "/cadastros/usuario", fields)[0] == 400
@@ -43,13 +45,15 @@ status, result = request(coord, "/cadastros/usuario", dict(fields, csrf_token=cs
 assert status == 200 and "Funcionário cadastrado." in result
 aoe = browser()
 status, page = login(aoe, fields["email"])
-assert status == 200 and 'href="/chamada"' in page
+assert status == 200 and 'href="/chamada"' in page and "Ocorrências de ausência" in page
 assert request(aoe, "/cadastros/usuario", dict(fields, email="denied@example.org", csrf_token=csrf(page)))[0] == 403
 status, result = request(coord, "/cadastros/usuario", dict(
     fields, email="diretor@example.org", profile="DIRETOR", csrf_token=csrf(result)))
 assert status == 200
 director = browser()
-assert login(director, "diretor@example.org")[0] == 403
+status, director_page = login(director, "diretor@example.org")
+assert status == 200 and "Ocorrências de ausência" in director_page and 'href="/cadastros"' not in director_page
+assert request(director, "/cadastros")[0] == 403
 assert request(director, "/chamada")[0] == 403
 
 assert 'action="/cadastros/turma"' in result

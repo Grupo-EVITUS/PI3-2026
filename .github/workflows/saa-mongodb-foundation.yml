@@ -103,6 +103,13 @@ jobs:
           php -l tests/Integration/Database/MongoPushTest.php
           php -l tests/Integration/push_web.php
           php -l tests/Integration/push_service_stub.php
+          php -l src/Database/MongoAbsenceNotice.php
+          php -l src/Database/MongoOccurrences.php
+          php -l templates/occurrences.php
+          php -l templates/absence_detail.php
+          php -l tests/Integration/Database/MongoOccurrencesTest.php
+          php -l tests/Integration/web_client.php
+          php -l tests/Integration/occurrences_web.php
       - name: Validate Web Push encryption (RFC 8291), VAPID and endpoint allowlist
         run: php tests/Unit/Push/WebPushTest.php
       - name: Validate Web Push HTTP delivery to a local push service
@@ -155,7 +162,9 @@ jobs:
         run: php tests/Integration/Database/MongoJustificationTest.php
       - name: Validate push invites, routing, retry and e-mail fallback
         run: php tests/Integration/Database/MongoPushTest.php
-      - name: Validate push notification flow over HTTP
+      - name: Validate occurrences, absence detail and communication retry
+        run: php tests/Integration/Database/MongoOccurrencesTest.php
+      - name: Validate push notification and occurrences flows over HTTP
         env:
           SAA_WEB_MODE: mongo_staff
           SAA_MONGO_ATTENDANCE_PREVIEW: "true"
@@ -179,6 +188,7 @@ jobs:
           trap 'kill $WEB $STUB' EXIT
           curl --retry 8 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8767/login > /dev/null
           php tests/Integration/push_web.php
+          php tests/Integration/occurrences_web.php
       - name: Stop MongoDB replica set
         if: always()
         run: docker rm -f saa-mongodb || true

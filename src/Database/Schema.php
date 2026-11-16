@@ -103,6 +103,8 @@ final class Schema
                 ['absence_id' => $id, 'guardian_id' => $id, 'email_to' => $text, 'token_hash' => $text,
                  'status' => $enum(['PENDENTE', 'ENVIADO', 'FALHA']), 'created_at' => $date,
                  'sent_at' => $nullableDate, 'expires_at' => $nullableDate, 'retry_of_id' => $nullableId,
+                 // Marca a comunicação com falha que já ganhou reenvio (trava contra cliques duplicados).
+                 'retried_at' => $nullableDate,
                  'failure_detail' => ['bsonType' => ['string', 'null']],
                  // Ausente em comunicações legadas/importadas, que foram sempre por e-mail.
                  'channel' => $enum(['EMAIL', 'PUSH'])]

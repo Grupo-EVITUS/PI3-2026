@@ -84,7 +84,9 @@
         <button class="button button-primary">Cadastrar responsável</button>
     </form>
     <?php foreach ($guardians as $guardian): ?>
-        <details><summary><?= e($guardian['name']) ?> · <?= e($guardian['email']) ?></summary>
+        <?php $devices = (int)(($pushDevices ?? [])[(string)$guardian['_id']] ?? 0); ?>
+        <details><summary><?= e($guardian['name']) ?> · <?= e($guardian['email']) ?>
+            · <span class="push-badge<?= $devices > 0 ? ' push-badge-on' : '' ?>"><?= $devices > 0 ? 'Push em ' . $devices . ' aparelho(s)' : 'Somente e-mail' ?></span></summary>
             <form method="post" action="/cadastros/responsavel" class="stack-form">
                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                 <input type="hidden" name="id" value="<?= e((string)$guardian['_id']) ?>">
@@ -104,6 +106,13 @@
                 <input type="hidden" name="entity" value="responsavel">
                 <button class="button button-quiet">Arquivar responsável</button>
             </form>
+            <?php if (!empty($pushEnabled)): ?>
+            <form method="post" action="/cadastros/responsavel/notificacoes">
+                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                <input type="hidden" name="id" value="<?= e((string)$guardian['_id']) ?>">
+                <button class="button button-quiet">Gerar convite de notificações no celular</button>
+            </form>
+            <?php endif; ?>
         </details>
     <?php endforeach; ?>
 </section>

@@ -103,7 +103,9 @@ final class Schema
                 ['absence_id' => $id, 'guardian_id' => $id, 'email_to' => $text, 'token_hash' => $text,
                  'status' => $enum(['PENDENTE', 'ENVIADO', 'FALHA']), 'created_at' => $date,
                  'sent_at' => $nullableDate, 'expires_at' => $nullableDate, 'retry_of_id' => $nullableId,
-                 'failure_detail' => ['bsonType' => ['string', 'null']]]
+                 'failure_detail' => ['bsonType' => ['string', 'null']],
+                 // Ausente em comunicações legadas/importadas, que foram sempre por e-mail.
+                 'channel' => $enum(['EMAIL', 'PUSH'])]
             ),
             Collections::MAIL_QUEUE => $schema(
                 ['communication_id', 'recipient', 'subject', 'body', 'status', 'created_at'],
@@ -112,6 +114,33 @@ final class Schema
                  'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate,
                  'next_attempt_at' => $nullableDate, 'claim_id' => $nullableId,
                  'attempts' => ['bsonType' => ['int', 'long']]]
+            ),
+            Collections::PUSH_SUBSCRIPTIONS => $schema(
+                ['guardian_id', 'endpoint', 'endpoint_hash', 'p256dh', 'auth', 'active', 'created_at'],
+                ['guardian_id' => $id, 'endpoint' => ['bsonType' => 'string', 'maxLength' => 1024],
+                 'endpoint_hash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
+                 'p256dh' => ['bsonType' => 'string', 'pattern' => '^[A-Za-z0-9_-]{87}$'],
+                 'auth' => ['bsonType' => 'string', 'pattern' => '^[A-Za-z0-9_-]{22}$'],
+                 'active' => $active, 'created_at' => $date, 'source' => $enum(['CONVITE', 'COMUNICADO']),
+                 'last_success_at' => $nullableDate, 'revoked_at' => $nullableDate,
+                 'revoke_reason' => ['bsonType' => ['string', 'null']]]
+            ),
+            Collections::PUSH_INVITES => $schema(
+                ['guardian_id', 'token_hash', 'created_by', 'created_at', 'expires_at'],
+                ['guardian_id' => $id, 'token_hash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
+                 'created_by' => $id, 'created_at' => $date, 'expires_at' => $date, 'used_at' => $nullableDate]
+            ),
+            Collections::PUSH_QUEUE => $schema(
+                ['communication_id', 'guardian_id', 'title', 'body', 'url', 'status', 'created_at'],
+                ['communication_id' => $id, 'guardian_id' => $id, 'title' => $text, 'body' => $text, 'url' => $text,
+                 'status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'ENCAMINHADO_EMAIL']),
+                 'fallback_email' => ['bsonType' => ['object', 'null'],
+                     'required' => ['recipient', 'subject', 'body'],
+                     'properties' => ['recipient' => $text, 'subject' => $text, 'body' => $text]],
+                 'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate,
+                 'next_attempt_at' => $nullableDate, 'claim_id' => $nullableId,
+                 'attempts' => ['bsonType' => ['int', 'long']],
+                 'failure_detail' => ['bsonType' => ['string', 'null']]]
             ),
             Collections::JUSTIFICATIONS => $schema(
                 ['absence_id', 'communication_id', 'guardian_id', 'reason', 'explanation', 'submitted_at'],
@@ -171,6 +200,22 @@ final class Schema
                 ['key' => ['status' => 1, 'created_at' => 1], 'name' => 'queue_status_created'],
                 ['key' => ['status' => 1, 'next_attempt_at' => 1], 'name' => 'queue_retry_due'],
                 ['key' => ['status' => 1, 'started_at' => 1], 'name' => 'queue_stale_lease'],
+            ],
+            Collections::PUSH_SUBSCRIPTIONS => [
+                // Um aparelho compartilhado pode servir a mais de um responsável.
+                ['key' => ['guardian_id' => 1, 'endpoint_hash' => 1], 'name' => 'push_guardian_endpoint_unique',
+                 'unique' => true],
+                ['key' => ['guardian_id' => 1, 'active' => 1, 'created_at' => -1], 'name' => 'push_guardian_active'],
+            ],
+            Collections::PUSH_INVITES => [
+                ['key' => ['token_hash' => 1], 'name' => 'push_invite_token_unique', 'unique' => true],
+                ['key' => ['guardian_id' => 1, 'created_at' => -1], 'name' => 'push_invite_guardian'],
+            ],
+            Collections::PUSH_QUEUE => [
+                ['key' => ['communication_id' => 1], 'name' => 'push_queue_communication_unique', 'unique' => true],
+                ['key' => ['status' => 1, 'created_at' => 1], 'name' => 'push_queue_status_created'],
+                ['key' => ['status' => 1, 'next_attempt_at' => 1], 'name' => 'push_queue_retry_due'],
+                ['key' => ['status' => 1, 'started_at' => 1], 'name' => 'push_queue_stale_lease'],
             ],
             Collections::JUSTIFICATIONS => [
                 ['key' => ['absence_id' => 1], 'name' => 'justification_absence_unique', 'unique' => true],

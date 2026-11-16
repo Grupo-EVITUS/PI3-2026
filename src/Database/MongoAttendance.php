@@ -14,7 +14,10 @@ use MongoDB\Driver\Session;
 use RuntimeException;
 use function MongoDB\with_transaction;
 
-/** Registra a chamada, as faltas e a fila de e-mail na mesma transação MongoDB. */
+/**
+ * Registra a chamada, as faltas e o aviso aos responsáveis na mesma transação MongoDB.
+ * Responsável com aparelho inscrito recebe push (com e-mail de reserva); os demais, e-mail.
+ */
 final class MongoAttendance
 {
     public function __construct(private readonly Database $database)
@@ -23,7 +26,7 @@ final class MongoAttendance
 
     /**
      * @param array<string, string> $studentStatuses IDs hexadecimais de alunos => PRESENTE|AUSENTE
-     * @return array{attendance_session_id: string, attendance_counts: array{present: int, absent: int, total: int}, without_guardians: list<string>, notifications: int}
+     * @return array{attendance_session_id: string, attendance_counts: array{present: int, absent: int, total: int}, without_guardians: list<string>, notifications: int, push_notifications: int}
      */
     public function record(
         ObjectId $actor, ObjectId $classId, array $studentStatuses, string $attendanceDate, string $baseUrl
@@ -118,6 +121,7 @@ final class MongoAttendance
                     'Turma ' . (string)$classId . '; data ' . $attendanceDate, $session);
                 $absent = 0;
                 $notifications = 0;
+                $pushNotifications = 0;
                 $withoutGuardians = [];
                 foreach ($entries as $entry) {
                     if ($entry['status'] !== 'AUSENTE') {
@@ -160,23 +164,44 @@ final class MongoAttendance
                         }
                         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
                         $communicationId = new ObjectId();
+                        $usePush = $this->database->push_subscriptions->countDocuments(
+                            ['guardian_id' => $guardian['_id'], 'active' => true], $options
+                        ) > 0;
                         $this->database->communications->insertOne([
                             '_id' => $communicationId, 'absence_id' => $absenceId, 'guardian_id' => $guardian['_id'],
                             'email_to' => $guardian['email'], 'token_hash' => hash('sha256', $token),
-                            'status' => 'PENDENTE', 'created_at' => $now,
+                            'status' => 'PENDENTE', 'created_at' => $now, 'channel' => $usePush ? 'PUSH' : 'EMAIL',
                         ], $options);
-                        $body = 'Olá, ' . $guardian['name'] . ".\n\n"
-                            . 'Informamos que ' . $entry['student_name'] . ' não compareceu à turma '
-                            . $class['name'] . ' em ' . (new DateTimeImmutable($attendanceDate))->format('d/m/Y')
-                            . ".\n\nPara enviar a justificativa, acesse o link individual:\n"
-                            . $baseUrl . '/justificar/' . rawurlencode($token)
-                            . "\n\nAtenciosamente,\nEquipe escolar";
-                        $this->database->mail_queue->insertOne([
-                            '_id' => new ObjectId(), 'communication_id' => $communicationId,
+                        $day = (new DateTimeImmutable($attendanceDate))->format('d/m/Y');
+                        $path = '/justificar/' . rawurlencode($token);
+                        $email = [
                             'recipient' => $guardian['email'],
                             'subject' => 'Comunicado de ausência — ' . $entry['student_name'],
-                            'body' => $body, 'status' => 'AGUARDANDO', 'created_at' => $now,
-                        ], $options);
+                            'body' => 'Olá, ' . $guardian['name'] . ".\n\n"
+                                . 'Informamos que ' . $entry['student_name'] . ' não compareceu à turma '
+                                . $class['name'] . ' em ' . $day
+                                . ".\n\nPara enviar a justificativa, acesse o link individual:\n"
+                                . $baseUrl . $path
+                                . "\n\nAtenciosamente,\nEquipe escolar",
+                        ];
+                        if ($usePush) {
+                            // O e-mail fica guardado e só entra na fila se o push não for entregue.
+                            $this->database->push_queue->insertOne([
+                                '_id' => new ObjectId(), 'communication_id' => $communicationId,
+                                'guardian_id' => $guardian['_id'],
+                                'title' => 'Ausência de ' . $entry['student_name'],
+                                'body' => $entry['student_name'] . ' não compareceu à turma ' . $class['name']
+                                    . ' em ' . $day . '. Toque para enviar a justificativa.',
+                                'url' => $path, 'fallback_email' => $email,
+                                'status' => 'AGUARDANDO', 'created_at' => $now,
+                            ], $options);
+                            $pushNotifications++;
+                        } else {
+                            $this->database->mail_queue->insertOne([
+                                '_id' => new ObjectId(), 'communication_id' => $communicationId,
+                                'status' => 'AGUARDANDO', 'created_at' => $now,
+                            ] + $email, $options);
+                        }
                         $notifications++;
                     }
                 }
@@ -185,6 +210,7 @@ final class MongoAttendance
                     'attendance_counts' => ['present' => count($entries) - $absent,
                         'absent' => $absent, 'total' => count($entries)],
                     'without_guardians' => $withoutGuardians, 'notifications' => $notifications,
+                    'push_notifications' => $pushNotifications,
                 ];
             });
             if ($result === null) {

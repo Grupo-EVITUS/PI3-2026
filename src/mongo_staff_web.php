@@ -8,6 +8,8 @@ use Saa\Database\MongoStaffRegistration;
 use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\MongoAttendance;
 use Saa\Database\MongoJustification;
+use Saa\Database\MongoPushSubscriptions;
+use Saa\Push\WebPush;
 use Saa\Database\Bson;
 use Saa\Database\MongoUserAuthenticator;
 
@@ -58,7 +60,54 @@ function renderSchoolDirectory(): void
     foreach ($database->student_guardians->find() as $link) {
         $links[(string)$link['guardian_id']][] = (string)$link['student_id'];
     }
-    render('staff_registration.php', compact('classes', 'students', 'guardians', 'links'));
+    $pushDevices = (new MongoPushSubscriptions($database))->activeCounts();
+    $pushEnabled = WebPush::configuredPublicKey() !== null;
+    render('staff_registration.php', compact('classes', 'students', 'guardians', 'links', 'pushDevices', 'pushEnabled'));
+}
+
+/** Dados do painel "ativar notificações" (null quando o servidor não tem chaves VAPID). */
+function pushPanel(string $endpoint): ?array
+{
+    $key = WebPush::configuredPublicKey();
+    return $key === null ? null : ['endpoint' => $endpoint, 'vapid_key' => $key];
+}
+
+function pushJson(int $status, array $data): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    exit;
+}
+
+/** Inscrição enviada pelo push.js como campo de formulário (o CSRF já foi validado). */
+function postedSubscription(): mixed
+{
+    $raw = $_POST['subscription'] ?? null;
+    if (!is_string($raw) || strlen($raw) > 4096) {
+        throw new InvalidArgumentException('Inscrição de notificação inválida.');
+    }
+    try {
+        return json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        throw new InvalidArgumentException('Inscrição de notificação inválida.');
+    }
+}
+
+function subscribeDevice(callable $subscribe): never
+{
+    if (WebPush::configuredPublicKey() === null) {
+        pushJson(503, ['error' => 'As notificações push ainda não foram configuradas pela escola.']);
+    }
+    try {
+        $subscribe(postedSubscription());
+    } catch (InvalidArgumentException $error) {
+        pushJson(422, ['error' => $error->getMessage()]);
+    } catch (DomainException $error) {
+        pushJson(409, ['error' => $error->getMessage()]);
+    }
+    pushJson(201, ['message' => 'Pronto! Os próximos avisos de ausência chegarão como notificação neste aparelho.']);
 }
 
 if ($path === '/' || $path === '/index.php') {
@@ -88,6 +137,33 @@ if ($path === '/logout') {
     $_SESSION = [];
     session_regenerate_id(true);
     Auth::redirect('/login');
+}
+if ($path === '/notificacoes') {
+    render('push_home.php');
+    return;
+}
+if (preg_match('#^/notificacoes/ativar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+    $service = new MongoPushSubscriptions(Mongo::database());
+    if ($method === 'POST') {
+        subscribeDevice(fn(mixed $subscription) => $service->subscribeWithInvite($matches[1], $subscription));
+    }
+    $invite = MongoPushSubscriptions::isToken($matches[1]) ? $service->findInvite($matches[1]) : null;
+    if ($invite === null) {
+        http_response_code(404);
+        render('error.php', ['title' => 'Convite indisponível',
+            'message' => 'Este convite é inválido, expirou ou já foi usado. Peça um novo convite à escola.']);
+        return;
+    }
+    render('push_activate.php', ['guardianName' => $invite['guardian_name'], 'pushPanel' => pushPanel($path)]);
+    return;
+}
+if (preg_match('#^/justificar/([A-Za-z0-9_-]+)/notificacoes$#', $path, $matches)) {
+    requirePost();
+    header('Referrer-Policy: no-referrer');
+    $service = new MongoPushSubscriptions(Mongo::database());
+    subscribeDevice(fn(mixed $subscription) => $service->subscribeWithCommunication($matches[1], $subscription));
 }
 if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
     header('Cache-Control: no-store');
@@ -123,6 +199,7 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
     }
     render('justification.php', [
         'absence' => $absence, 'error' => $error, 'reasons' => Services::REASONS,
+        'pushPanel' => pushPanel('/justificar/' . $token . '/notificacoes'),
         'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
         'explanation' => is_string($explanation) ? $explanation : '',
     ]);
@@ -153,10 +230,34 @@ if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
     }
     return;
 }
-if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel', '/cadastros/arquivar'], true)) {
+if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel', '/cadastros/arquivar', '/cadastros/responsavel/notificacoes'], true)) {
     notFound();
 }
 Auth::requireRole(['COORDENACAO']);
+if ($path === '/cadastros/responsavel/notificacoes') {
+    requirePost();
+    header('Cache-Control: no-store');
+    try {
+        $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+        $guardianId = Bson::objectId($_POST['id'] ?? null);
+        if ($actor === null || $guardianId === null) {
+            throw new InvalidArgumentException('Responsável inválido.');
+        }
+        if (WebPush::configuredPublicKey() === null) {
+            throw new InvalidArgumentException('Configure as chaves VAPID antes de convidar responsáveis.');
+        }
+        $token = (new MongoPushSubscriptions(Mongo::database()))->createInvite($actor, $guardianId);
+        $guardian = Mongo::database()->guardians->findOne(['_id' => $guardianId]);
+        render('push_invite.php', ['guardianName' => $guardian['name'] ?? '',
+            'inviteUrl' => baseUrl('/notificacoes/ativar/' . $token)]);
+        return;
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        flash($error->getMessage(), 'error');
+    }
+    renderSchoolDirectory();
+    return;
+}
 if ($path === '/cadastros' && $method === 'GET') {
     renderSchoolDirectory();
     return;

@@ -81,12 +81,52 @@ php bin/process_mail_queue_mongodb.php --watch
 
 O worker reivindica cada e-mail, tenta novamente falhas transitórias até três vezes com intervalo e ignora itens em `QUARENTENA`. Depois do SMTP, o responsável pode justificar pelo link individual. A entrega é **ao menos uma vez** se houver queda entre a aceitação do SMTP e a confirmação no banco. A importação de dados SQLite, a reconciliação e a troca operacional ainda não foram concluídas; mantenha a prévia desligada para uso escolar real até esses passos.
 
+### Notificação push no Android (PWA)
+
+No modo MongoDB, o aviso de ausência chega ao celular Android do responsável como **notificação push**. O **e-mail continua como reserva**. Não há app de loja: o SAA é um PWA. O responsável abre um link no Chrome, toca em **Ativar notificações** e, se quiser, instala o atalho “Presença” na tela inicial. A notificação aparece na barra do Android, e o toque abre o formulário de justificativa.
+
+1. **Chaves VAPID** (uma vez por ambiente; trocar a chave invalida os aparelhos inscritos):
+
+   ```powershell
+   php bin/generate_vapid_keys.php
+   $env:VAPID_PUBLIC_KEY = "..."; $env:VAPID_PRIVATE_KEY = "..."   # segredo, não versionar
+   $env:VAPID_SUBJECT = "mailto:secretaria@escola.org"
+   php bin/init_mongodb.php   # cria push_subscriptions, push_invites e push_queue
+   ```
+
+2. **Workers**: execute o de push e mantenha o de e-mail para a reserva:
+
+   ```powershell
+   php bin/process_push_queue_mongodb.php --watch
+   php bin/process_mail_queue_mongodb.php --watch
+   ```
+
+3. **Ativação pelo responsável** (sem login), de duas formas:
+   - em **Cadastros › Responsáveis**, a Coordenação gera um **convite de notificações**: link de uso único, válido por 7 dias, que pode ser entregue na matrícula;
+   - a página de justificativa aberta pelo link de um e-mail também oferece **Ativar notificações neste celular**.
+
+**Regras de entrega.** Na chamada, cada responsável com aparelho ativo recebe o aviso pela fila `push_queue`, e o e-mail fica guardado como reserva. Quem não tem aparelho ativo recebe e-mail, como antes. O worker envia aos até 5 aparelhos do responsável:
+
+| Resposta do serviço de push | O que acontece |
+|---|---|
+| 2xx em ao menos um aparelho | Comunicação `ENVIADO` (canal `PUSH`). |
+| 404/410 | Aparelho desativado (permissão revogada ou app removido). |
+| 429/5xx ou rede | Nova tentativa com intervalo crescente, até 3 tentativas. |
+| Nenhum aparelho entregue | Aviso movido para `mail_queue` (`ENCAMINHADO_EMAIL`) na mesma transação. |
+
+**Requisitos e segurança.**
+- O navegador só permite Web Push em **HTTPS** (ou `localhost`). Para testar num celular real, publique com HTTPS, por exemplo por um túnel, ou use o encaminhamento de portas do `chrome://inspect`.
+- A criptografia segue a RFC 8291 (aes128gcm) e a identificação segue a RFC 8292 (VAPID), apenas com `ext-openssl`, sem dependências novas.
+- Endpoints de inscrição só são aceitos para serviços de push conhecidos, como `fcm.googleapis.com` (proteção contra SSRF). `PUSH_ALLOWED_ENDPOINT_PREFIXES` existe **somente para testes** com serviço de push local.
+- Convites e links são guardados como hash. O conteúdo da notificação (que contém o link) é apagado da fila após o desfecho.
+- No Windows, `openssl_pkey_new` exige `OPENSSL_CONF` apontando para `extras\ssl\openssl.cnf` da instalação do PHP.
+
 ## Perfis e funcionalidades
 
 - **AOE:** registrar ausências, consultar ocorrências e reenviar comunicações com falha.
 - **Coordenação:** mesmos recursos da AOE, cadastros de turmas, alunos e responsáveis, vínculos entre responsáveis e alunos e criação de usuários internos.
 - **Diretor:** consulta de ocorrências e justificativas, sem operações de escrita.
-- **Responsável:** sem conta; responde por link individual de alta entropia enviado ao e-mail cadastrado.
+- **Responsável:** sem conta; responde por link individual de alta entropia enviado ao e-mail cadastrado ou, no modo MongoDB, recebido como notificação push no Android.
 
 O MVP inclui cadastro/edição/arquivamento de turmas, alunos e responsáveis; registro de faltas de vários alunos da mesma turma; restrição de duplicidade por aluno/data; fila assíncrona; formulário público; painel filtrado por status; reenvio de falhas; e trilha de auditoria.
 
@@ -143,6 +183,6 @@ O armazenamento usa SQLite para facilitar execução local e testes; as regras f
 
 ## Fora do escopo da v1
 
-Pesquisa avançada por aluno/turma/data, histórico detalhado por aluno, relatórios/gráficos, WhatsApp/SMS, aplicativo mobile, integrações institucionais e análise avançada. A estrutura de ocorrências, justificativas, serviços e logs permite adicionar essas capacidades em versões futuras sem introduzir esses recursos no MVP.
+Pesquisa avançada por aluno/turma/data, histórico detalhado por aluno, relatórios/gráficos, WhatsApp/SMS, aplicativo nativo de loja (o modo MongoDB oferece PWA com push), integrações institucionais e análise avançada. A estrutura de ocorrências, justificativas, serviços e logs permite adicionar essas capacidades em versões futuras sem introduzir esses recursos no MVP.
 
 > O arquivo ZIP `saa_flask_mongodb_dashboard_atualizado.zip` e os diagramas existentes são materiais anteriores do repositório; esta versão executável do MVP está implementada em PHP.

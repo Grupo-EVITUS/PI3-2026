@@ -25,7 +25,8 @@ não se deve inventar presença ou ausência durante a carga.
 3. Ensaiar os cadastros em um ambiente isolado com dados fictícios e registrar divergências.
 4. Com os dados reais autorizados, validar as contagens de turmas, alunos e vínculos e somente então habilitar o envio de e-mail no ambiente operacional.
 
-O procedimento de migração do histórico SQLite para MongoDB é separado da
-entrada de uma lista nova de alunos. O importador SQLite existente não lê CSV
-ou planilhas; o formato da lista real deverá ser confirmado antes de criar uma
-importação em lote, se a equipe precisar dessa funcionalidade.
+Hoje, turmas, alunos e responsáveis são cadastrados um a um em **Cadastros**,
+pela Coordenação. O sistema não importa CSV nem planilhas (o antigo importador
+SQLite→MongoDB foi removido em novembro de 2026 e também não lia planilhas). Se
+a equipe precisar de carga em lote, o formato da lista real deve ser confirmado
+antes de criar essa importação.

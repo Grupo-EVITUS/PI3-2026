@@ -1,5 +1,28 @@
 # Pendências identificadas na auditoria documental
 
+## Atualização de 18/11/2026
+
+A arquitetura mudou depois desta auditoria: o SAA passou a usar **somente PHP + MongoDB**, e o SQLite foi removido do código (branch `refactor/remover-sqlite`). A auditoria original de 28/10 segue abaixo, sem alterações. Situação de cada item em 18/11:
+
+| Pendência (28/10) | Situação em 18/11/2026 |
+|---|---|
+| Alinhar arquitetura oficial | **Resolvida.** Decisão do grupo: PHP + MongoDB. O SQLite e o importador SQLite→MongoDB foram removidos; ver [arquitetura](../../ARQUITETURA_CHAMADA_MONGODB.md). |
+| Dashboard (#46, #48) | **Parcial.** A chamada completa da #46 está implementada; gráficos e relatórios por período continuam pendentes. |
+| Nascimento do aluno (#38) e telefone do responsável (#39) | **Pendente.** Os cadastros no MongoDB ainda não têm esses campos. |
+| Homologação sem evidência de testes | **Mudou.** `tests/run.php` foi removido junto com o SQLite. Os testes atuais (banco, push e fluxos HTTP) rodam no CI do MongoDB em cada pull request para a `main`; os resultados do CI são a evidência. |
+| Envio de e-mail | **Parcial.** O worker exige `MAIL_MODE=smtp` e é testado no CI com o Mailpit; falta testar com o SMTP real da escola. O aviso também pode chegar por notificação push no Android. |
+| Tokens sem expiração | **Pendente.** Os links continuam sem prazo; o campo `expires_at` já é respeitado se for preenchido. |
+| Filtros por aluno, turma e período (#49) | **Pendente.** As ocorrências filtram apenas por situação (pendente/respondida). |
+| Recuperação de senha (#32) | **Pendente.** |
+| Histórico escolar e privacidade | **Pendente.** O MongoDB guarda a turma do dia em cada chamada e falta, mas não há matrícula histórica; validar LGPD, acesso e retenção antes de usar dados reais. |
+| Próxima conferência antes da entrega | Trocar `php tests/run.php` pelos testes listados no [README](../../../../README.md#testes) e pelos resultados do CI. |
+
+Os itens de documentação e processo (sprints 1 a 6) não foram reavaliados nesta atualização.
+
+---
+
+## Auditoria original (28/10/2026)
+
 **Referência:** `main` até 28/10/2026; issues consultadas em 04/11/2026. Não é um relatório de testes executados.
 
 ## Críticas

@@ -35,3 +35,5 @@ As datas de Sprints 1–4 se referem às **janelas planejadas**, não necessaria
 - [`a0e7781`](https://github.com/Grupo-EVITUS/PI3-2026/commit/a0e7781652ca76800add049e791f200fb3996c6a), 28/10: inclusão dos documentos de sprints.
 
 Consulte as [pendências](sprints/PENDENCIAS.md) antes de marcar uma tarefa como concluída.
+
+> **Nota de 18/11/2026:** os commits acima são da primeira versão, em PHP + SQLite. Depois das sprints, o SAA passou a usar somente PHP + MongoDB, e o SQLite foi removido (branch `refactor/remover-sqlite`). As sprints ficam registradas como aconteceram; a situação atual de cada pendência está na [atualização das pendências](sprints/PENDENCIAS.md#atualização-de-18112026).

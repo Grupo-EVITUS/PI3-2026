@@ -24,14 +24,9 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
     </a>
     <?php if (!empty($_SESSION['user_id'])): ?>
         <nav class="main-nav" aria-label="Navegação principal">
-            <?php if (getenv('SAA_WEB_MODE') !== 'mongo_staff'): ?>
             <a href="/ocorrencias">Ocorrências</a>
             <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
-                <a href="/ausencias/registrar">Registrar ausência</a>
-            <?php endif; ?>
-            <?php endif; ?>
-            <?php if (mongoAttendancePreviewEnabled() && in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
-                <a href="/chamada">Chamada (homologação)</a>
+                <a href="/chamada">Chamada</a>
             <?php endif; ?>
             <?php if (($_SESSION['profile'] ?? '') === 'COORDENACAO'): ?>
                 <a href="/cadastros">Cadastros</a>

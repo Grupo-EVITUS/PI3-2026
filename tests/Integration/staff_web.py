@@ -36,6 +36,8 @@ def login(client, email):
 
 coord = browser()
 status, page = login(coord, os.environ["INITIAL_ADMIN_EMAIL"])
+assert status == 200 and "Ocorrências de ausência" in page
+status, page = request(coord, "/cadastros")
 assert status == 200 and 'action="/cadastros/usuario"' in page
 fields = dict(name="Equipe", email="aoe@example.org", profile="AOE", password=password)
 assert request(coord, "/cadastros/usuario", fields)[0] == 400
@@ -43,13 +45,15 @@ status, result = request(coord, "/cadastros/usuario", dict(fields, csrf_token=cs
 assert status == 200 and "Funcionário cadastrado." in result
 aoe = browser()
 status, page = login(aoe, fields["email"])
-assert status == 200 and 'href="/chamada"' in page
+assert status == 200 and 'href="/chamada"' in page and "Ocorrências de ausência" in page
 assert request(aoe, "/cadastros/usuario", dict(fields, email="denied@example.org", csrf_token=csrf(page)))[0] == 403
 status, result = request(coord, "/cadastros/usuario", dict(
     fields, email="diretor@example.org", profile="DIRETOR", csrf_token=csrf(result)))
 assert status == 200
 director = browser()
-assert login(director, "diretor@example.org")[0] == 403
+status, director_page = login(director, "diretor@example.org")
+assert status == 200 and "Ocorrências de ausência" in director_page and 'href="/cadastros"' not in director_page
+assert request(director, "/cadastros")[0] == 403
 assert request(director, "/chamada")[0] == 403
 
 assert 'action="/cadastros/turma"' in result
@@ -87,7 +91,7 @@ status, result = request(coord, "/cadastros/arquivar", {
 })
 assert status == 200 and "5º ano A" not in result
 
-# A rota Mongo de chamada fica disponível apenas no modo de homologação da CI.
+# Chamada: lista completa da turma, uma única vez por dia.
 status, result = request(coord, "/cadastros/turma", dict(
     name="Turma Chamada CI", grade="6º ano", academic_year="2026", shift="Tarde", csrf_token=csrf(result)))
 assert status == 200
@@ -105,7 +109,8 @@ assert status == 200
 guest_status, guest_page = request(browser(), "/chamada")
 assert guest_status == 200 and 'action="/login"' in guest_page
 status, attendance_page = request(aoe, "/chamada?turma_id=" + attendance_class)
-assert status == 200 and "O envio depende da execução do worker SMTP" in attendance_page
+assert status == 200 and "Os responsáveis dos ausentes recebem o aviso" in attendance_page
+assert "homologação" not in attendance_page.lower()
 student_ids = re.findall(r'name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', attendance_page)
 assert len(student_ids) == 2 and first_id in student_ids
 partial = {"class_id": attendance_class, "absence_date": "2026-11-15",

@@ -29,7 +29,7 @@ final class HealthCheck
         }
 
         $existingCollections = array_keys($collectionInfo);
-        $missingCollections = array_values(array_diff(Collections::legacyImport(), $existingCollections));
+        $missingCollections = array_values(array_diff(array_keys(Schema::definitions()), $existingCollections));
         $invalidValidators = [];
         $missingIndexes = [];
         foreach (Schema::definitions() as $collectionName => $definition) {

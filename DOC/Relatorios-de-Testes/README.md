@@ -13,7 +13,7 @@ Use `AAAA-MM-DD_nome-sobrenome.md` (exemplo: `2026-11-15_ana-silva.md`). Se fize
 
 - Data:
 - Versão testada (branch e commit):
-- Ambiente (SQLite ou MongoDB, sistema operacional e navegador):
+- Ambiente (versão do MongoDB, sistema operacional, navegador e, no teste de notificação, modelo do celular):
 - Funcionalidade testada:
 - Objetivo e pré-condições:
 

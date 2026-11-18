@@ -1,16 +1,12 @@
-<?php $pageTitle = 'Chamada MongoDB - homologação'; ?>
+<?php $pageTitle = 'Chamada'; ?>
 <section class="page-heading">
     <div>
-        <span class="eyebrow">Homologação MongoDB</span>
+        <span class="eyebrow">Frequência</span>
         <h1>Registrar chamada</h1>
-        <p>Marque todos os alunos ativos como presentes ou ausentes.</p>
+        <p>Marque todos os alunos ativos como presentes ou ausentes. Os responsáveis dos ausentes recebem o aviso
+            por notificação no celular ou, se não tiverem ativado, por e-mail.</p>
     </div>
 </section>
-<div class="notice notice-warning" role="status">
-    <strong>Homologação MongoDB.</strong>
-    A chamada coloca as comunicações na fila. O envio depende da execução do worker SMTP MongoDB;
-    a justificativa fica disponível depois da entrega. Use esta tela somente para testes de homologação.
-</div>
 <section class="card form-card class-selector-card">
     <form method="get" action="/chamada" class="class-selector-form">
         <div class="field">
@@ -59,7 +55,7 @@
             <?php endif; ?>
         </fieldset>
         <?php if ($students !== [] && count($students) <= 1000): ?>
-            <div class="form-actions"><button class="button button-primary" type="submit">Concluir chamada de homologação</button></div>
+            <div class="form-actions"><button class="button button-primary" type="submit">Concluir chamada e avisar responsáveis</button></div>
         <?php endif; ?>
     </form>
 <?php else: ?>

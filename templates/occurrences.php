@@ -6,7 +6,7 @@
         <p>Consulte o andamento das comunicações e as justificativas enviadas.</p>
     </div>
     <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
-        <a class="button button-primary" href="/ausencias/registrar">Registrar ausência <span aria-hidden="true">+</span></a>
+        <a class="button button-primary" href="/chamada">Fazer chamada <span aria-hidden="true">+</span></a>
     <?php endif; ?>
 </section>
 
@@ -38,11 +38,11 @@
                         </td>
                         <td data-label="Justificativa">
                             <?php if ($row['reason']): ?>
-                                <?= e(Services::REASONS[$row['reason']] ?? $row['reason']) ?>
+                                <?= e(\Saa\Database\MongoJustification::REASONS[$row['reason']] ?? $row['reason']) ?>
                                 <?php if ($row['reason'] === 'OUTRO' && $row['explanation']): ?><small class="subline"><?= e($row['explanation']) ?></small><?php endif; ?>
                             <?php else: ?><span class="muted">Aguardando</span><?php endif; ?>
                         </td>
-                        <td data-label="Detalhes"><a class="text-link" href="/ausencias/<?= (int)$row['id'] ?>">Ver detalhes <span aria-hidden="true">→</span></a></td>
+                        <td data-label="Detalhes"><a class="text-link" href="/ausencias/<?= e((string)$row['id']) ?>">Ver detalhes <span aria-hidden="true">→</span></a></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

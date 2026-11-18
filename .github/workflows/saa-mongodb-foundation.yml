@@ -32,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: mongodb-2.5.0, mbstring, pdo_sqlite
+          extensions: mongodb-2.5.0, mbstring
           tools: composer:v2
           coverage: none
       - name: Start MongoDB 7 replica set
@@ -60,10 +60,6 @@ jobs:
       - name: Lint MongoDB schema and bootstrap
         run: |
           php -l src/Database/Schema.php
-          php -l src/Migration/SQLiteImporter.php
-          php -l src/Migration/SQLiteSnapshot.php
-          php -l bin/import_sqlite_mongodb.php
-          php -l tests/Integration/Database/SQLiteImporterTest.php
           php -l src/Database/InitialAdmin.php
           php -l src/Database/HealthCheck.php
           php -l src/Database/MongoUserAuthenticator.php
@@ -72,6 +68,9 @@ jobs:
           php -l src/Database/MongoAttendance.php
           php -l src/Database/MongoJustification.php
           php -l src/Database/MongoMailQueue.php
+          php -l src/Mailer.php
+          php -l src/bootstrap.php
+          php -l public/index.php
           php -l bin/process_mail_queue_mongodb.php
           php -l src/mongo_staff_web.php
           php -l src/Helpers.php
@@ -103,14 +102,19 @@ jobs:
           php -l tests/Integration/Database/MongoPushTest.php
           php -l tests/Integration/push_web.php
           php -l tests/Integration/push_service_stub.php
+          php -l src/Database/MongoAbsenceNotice.php
+          php -l src/Database/MongoOccurrences.php
+          php -l templates/occurrences.php
+          php -l templates/absence_detail.php
+          php -l tests/Integration/Database/MongoOccurrencesTest.php
+          php -l tests/Integration/web_client.php
+          php -l tests/Integration/occurrences_web.php
       - name: Validate Web Push encryption (RFC 8291), VAPID and endpoint allowlist
         run: php tests/Unit/Push/WebPushTest.php
       - name: Validate Web Push HTTP delivery to a local push service
         run: php tests/Unit/Push/WebPushDeliveryTest.php
       - name: Validate schema, indexes and idempotent bootstrap
         run: php tests/Integration/Database/MongoSchemaTest.php
-      - name: Validate isolated SQLite historical import and quarantine
-        run: php tests/Integration/Database/SQLiteImporterTest.php
       - name: Validate initial administrator and readiness check
         run: php tests/Integration/Database/MongoAdminHealthTest.php
       - name: Validate isolated MongoDB authentication
@@ -121,8 +125,6 @@ jobs:
         run: php tests/Integration/Database/MongoTransactionTest.php
       - name: Validate login and staff registration over HTTP
         env:
-          SAA_WEB_MODE: mongo_staff
-          SAA_MONGO_ATTENDANCE_PREVIEW: "true"
           MAIL_MODE: smtp
           SMTP_HOST: 127.0.0.1
           SMTP_PORT: "1025"
@@ -155,10 +157,10 @@ jobs:
         run: php tests/Integration/Database/MongoJustificationTest.php
       - name: Validate push invites, routing, retry and e-mail fallback
         run: php tests/Integration/Database/MongoPushTest.php
-      - name: Validate push notification flow over HTTP
+      - name: Validate occurrences, absence detail and communication retry
+        run: php tests/Integration/Database/MongoOccurrencesTest.php
+      - name: Validate push notification and occurrences flows over HTTP
         env:
-          SAA_WEB_MODE: mongo_staff
-          SAA_MONGO_ATTENDANCE_PREVIEW: "true"
           PUBLIC_BASE_URL: http://127.0.0.1:8767
           MONGODB_DB: saa_push_web_ci
           INITIAL_ADMIN_NAME: Coordenação
@@ -179,6 +181,7 @@ jobs:
           trap 'kill $WEB $STUB' EXIT
           curl --retry 8 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8767/login > /dev/null
           php tests/Integration/push_web.php
+          php tests/Integration/occurrences_web.php
       - name: Stop MongoDB replica set
         if: always()
         run: docker rm -f saa-mongodb || true

@@ -1,5 +1,13 @@
 # Baseline de produção e qualidade — SAA
 
+> **Atualização de 18/11/2026.** Esta baseline descreve a versão PHP + SQLite de 13/11/2026 e fica como registro histórico. Depois dela, o SAA passou a usar somente MongoDB, e o SQLite, as migrações SQL, `Database.php`, `Services.php` e `tests/run.php` foram removidos (branch `refactor/remover-sqlite`).
+>
+> **O que continua valendo:** o critério de que a ausência guarda a turma do dia (itens 3, 4 e 6). No MongoDB, isso é feito pela cópia da turma na chamada (`attendance_sessions`) e pelo `class_id` da falta; ver a [arquitetura](../ARQUITETURA_CHAMADA_MONGODB.md).
+>
+> **O que mudou:**
+> - **Migrações:** os critérios sobre `schema_migrations` (itens 1, 2, 5 e 7) não se aplicam mais. O banco é preparado por `bin/init_mongodb.php`, que pode ser executado de novo; ver a [referência do banco](../MONGODB_FOUNDATION.md).
+> - **Avaliação SOLID:** a concentração de rotas e regras em `public/index.php` e `Services.php` foi substituída por classes `Mongo*` separadas por assunto. Uma nova avaliação de arquitetura ainda não foi feita.
+
 **Data:** 13/11/2026  
 **Branch de revisão remota do código:** `fix/saa-absence-class-snapshot`  
 **Branch local de trabalho:** `quality/saa-baseline-integrity`  

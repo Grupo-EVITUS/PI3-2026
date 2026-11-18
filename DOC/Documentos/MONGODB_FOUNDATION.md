@@ -1,115 +1,105 @@
-# Fundação MongoDB — subetapa 2b.3
+# Banco de dados MongoDB do SAA
 
-Implementa contratos das dez coleções legadas, índices e aplicação explícita reexecutável.
-Inclui criação segura da conta inicial e health check interno de prontidão. O runtime web
-permanece SQLite até o port integral da etapa 3. Não há dual-write.
+**Atualizado em:** 18/11/2026 (branch `refactor/remover-sqlite`)
 
-## Execução
-Após instalar as dependências e configurar MONGODB_URI e MONGODB_DB:
+O MongoDB 7 é o único banco do SAA. Este documento descreve as coleções, as regras dos dados e como preparar e conferir o banco. O funcionamento das telas e das filas está na [arquitetura](ARQUITETURA_CHAMADA_MONGODB.md); a instalação, no [README](../../README.md).
+
+## Coleções
+
+Todas têm validação `$jsonSchema` (`validationLevel: strict`, `validationAction: error`) e índices nomeados, definidos em `src/Database/Schema.php`. Os nomes estão em `src/Database/Collections.php`.
+
+| Coleção | Conteúdo | Índices principais |
+|---|---|---|
+| `users` | Funcionários: nome, e-mail, hash da senha, perfil (`AOE`, `COORDENACAO`, `DIRETOR`), ativo. | E-mail único (`email_key`); uma única conta inicial. |
+| `classes` | Turmas: nome, série, ano letivo, turno (`Manhã`, `Tarde`, `Noite`, `Integral`), ativa. | — |
+| `students` | Alunos: nome, matrícula opcional, turma atual, ativo. | Matrícula única quando preenchida; turma + ativo. |
+| `guardians` | Responsáveis: nome, e-mail, parentesco, ativo. | — |
+| `student_guardians` | Vínculo aluno ↔ responsável. | Par único; por responsável. |
+| `attendance_sessions` | Chamada de uma turma numa data, com a lista completa de alunos. | Turma + data únicos. |
+| `absences` | Falta de um aluno num dia: `PENDENTE` ou `RESPONDIDA`. | Aluno + data únicos; chamada + aluno únicos. |
+| `communications` | Aviso a um responsável sobre uma falta: hash do link, canal (`EMAIL`/`PUSH`), situação (`PENDENTE`/`ENVIADO`/`FALHA`). | Hash do link único. |
+| `mail_queue` | Fila de e-mails: `AGUARDANDO`, `PROCESSANDO`, `CONCLUIDO`, `FALHA`, `QUARENTENA`. | Um item por aviso; reserva e novas tentativas. |
+| `push_subscriptions` | Celulares inscritos para notificação (até 5 ativos por responsável). | Responsável + endereço únicos. |
+| `push_invites` | Convites de ativação (uso único, 7 dias). | Hash do convite único. |
+| `push_queue` | Fila de notificações: `AGUARDANDO`, `PROCESSANDO`, `CONCLUIDO`, `ENCAMINHADO_EMAIL`. | Um item por aviso; reserva, novas tentativas e lembrete. |
+| `justifications` | Resposta do responsável: motivo, explicação e data. | Uma por ausência. |
+| `operation_logs` | Auditoria: quem fez o quê, quando. | Por data. |
+
+## Regras dos dados
+
+- **IDs:** todos os IDs e referências são `ObjectId`. Não há chave estrangeira no MongoDB; a integridade entre coleções é garantida pelas classes `Mongo*` dentro de transações.
+- **Datas:** instantes são `BSON date` em UTC. O dia de uma falta ou chamada é texto `AAAA-MM-DD`; a validação confere o formato, e `Bson::isDay` confere se a data existe no calendário.
+- **Booleanos:** `active` é sempre `true`/`false`; registros arquivados não são apagados.
+- **E-mail dos funcionários:** `users.email_key` é o e-mail com as letras A–Z em minúsculas (`Schema::emailKey`). A validação confere essa igualdade no servidor, e o índice único usa essa chave. Assim, `Ana@Escola.org` e `ana@escola.org` são o mesmo usuário, sem depender de regras de idioma.
+- **Conta inicial:** `users.is_initial_admin` é opcional. Quando é `true`, um índice único parcial impede que duas contas iniciais sejam criadas, mesmo em execuções simultâneas.
+- **Matrícula:** `registration_no` pode faltar; a unicidade só vale quando é texto.
+- **Responsáveis:** o e-mail do responsável **não** é único (mais de um cadastro pode usar o mesmo e-mail), e não há limite de responsáveis por aluno.
+- **Turma da falta:** `absences.class_id` e a chamada guardam a turma do dia. `class_snapshot_source` vale `captured` nos registros novos e `unknown` quando a turma não é conhecida.
+- **Situação da falta:** `PENDENTE`/`RESPONDIDA` diz se houve justificativa, não se o aluno esteve presente. Uma falta justificada continua sendo falta.
+- **Campos extras:** a validação permite campos além dos listados, para evoluções sem migração. Nenhum dado é inventado para preencher campos ausentes.
+
+## Preparar o banco
+
+Depois de configurar `MONGODB_URI` e `MONGODB_DB`:
+
 ```sh
-php bin/init_mongodb.php
-php tests/Integration/Database/MongoSchemaTest.php
-php bin/create_initial_admin_mongodb.php
-php bin/healthcheck_mongodb.php
-php tests/Integration/Database/MongoAdminHealthTest.php
+php bin/init_mongodb.php                 # cria coleções, validações e índices
+php bin/create_initial_admin_mongodb.php # primeira conta da Coordenação (uma única vez)
+php bin/healthcheck_mongodb.php          # confere se está tudo pronto
 ```
-O teste usa banco aleatório próprio e o remove ao terminar. Nunca remove a base configurada.
-O inicializador não cria usuário, senha padrão, dados escolares ou e-mails. A conta inicial
-é criada separadamente, uma única vez, com perfil `COORDENACAO`; o e-mail e a senha vêm de
-`INITIAL_ADMIN_NAME`, `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD`, injetados por um
-gerenciador seguro de segredos. O comando não aceita credenciais em argumentos e não as imprime.
-Após a primeira conta ou qualquer outro usuário existir, o comando recusa nova inicialização.
-Um índice único parcial também impede duas criações concorrentes da conta inicial.
-Não é executado automaticamente na inicialização web.
 
-O health check é somente leitura, restrito a CLI e confere estado de conexão, coleções,
-validators (`strict`/`error`) e definições de índices (chaves, unicidade e filtro parcial).
-Também rejeita índices sparse, ocultos ou TTL, que poderiam alterar a semântica ou remover
-logs de auditoria. Não retorna URI, nome do banco, documentos nem mensagens do driver.
-Um endpoint HTTP de prontidão será avaliado quando o runtime MongoDB for implementado na etapa 3;
-não se expõe uma rota pública enquanto a aplicação web ainda usa SQLite.
+**`init_mongodb.php`** pode ser executado de novo a cada atualização do sistema: reaplica validações e índices sem apagar documentos.
+- Se algum documento existente não passar na validação nova, ou se um índice único encontrar duplicatas, o comando para e avisa, sem corrigir nada sozinho.
+- A criação de coleções e índices não é transacional: uma falha pode deixar parte pronta. Corrija a causa e execute de novo.
+- Não rode duas execuções ao mesmo tempo.
+- O usuário do MongoDB precisa das permissões `createCollection`, `collMod`, `createIndex`, `listCollections` e leitura.
+- O comando não cria usuários, dados de exemplo nem e-mails.
 
-## Contrato de migração
-- ObjectId em IDs/referências. Mapeamento dos IDs SQLite é trabalho da etapa 4.
-- Instantes são BSON date; absence_date é dia civil string AAAA-MM-DD.
-  O validator verifica formato; Bson::isDay e o serviço devem validar o calendário.
-- active é booleano, convertido explicitamente de 0/1 pelo importador.
-- users.email_key é a dobra ASCII de email, como SQLite NOCASE.
-  Schema::emailKey calcula a chave; o validator confere a igualdade no servidor.
-  O índice único não depende de collation Unicode diferente do SQLite.
-- users.is_initial_admin é opcional; quando true, um índice único parcial limita a criação
-  da conta administrativa inicial a uma única conta, inclusive em execuções concorrentes.
-- registration_no ausente/nulo é permitido; unicidade somente para strings.
-- guardians.email não é único; vínculos não têm limite artificial de três.
-- class_id de ausências legadas pode ser desconhecido. class_snapshot_source permite
-  captured, legacy_backfill ou unknown. O port deve exigir turma nos novos registros
-  e garantir imutabilidade do snapshot: validators não comparam versão anterior.
-- PENDENTE/RESPONDIDA continuam sendo estados de justificativa da ausência, nunca presença.
-- QUARENTENA é estado explícito da fila para o importador; nenhum worker Mongo existe nesta entrega.
-- Campos adicionais são permitidos para proveniência; nenhum histórico é fabricado.
-- Referências entre coleções não são FKs: integridade relacional depende do serviço/importador.
-- attendance_sessions está reservada à etapa 5 e não é criada.
+**`create_initial_admin_mongodb.php`** cria a primeira conta, com perfil `COORDENACAO`.
+- Nome, e-mail e senha (mínimo de 14 caracteres) vêm de `INITIAL_ADMIN_NAME`, `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD`, nunca de argumentos, e não são impressos.
+- O comando recusa a execução se já existir qualquer usuário.
+- Ele não roda automaticamente quando o site sobe.
 
-## Reexecução e falhas
-Validators strict/error e índices nomeados são reaplicados sem apagar documentos.
-Antes de collMod, o inicializador rejeita documentos incompatíveis existentes.
-Índices conflitantes/duplicidades interrompem o processo; não há deduplicação destrutiva.
-DDL não é transacional: uma falha pode deixar coleções anteriores preparadas.
-Corrigir a causa e reexecutar. Execuções administrativas devem ser serializadas.
-Requer permissões createCollection, collMod, createIndex, listCollections e leitura.
+**`healthcheck_mongodb.php`** é somente leitura e só roda no terminal.
+- Confere a conexão, se todas as coleções do esquema existem, se as validações estão em `strict`/`error` e se os índices batem com a definição (chaves, unicidade e filtro parcial).
+- Rejeita índices `sparse`, ocultos ou com expiração (TTL), que poderiam mudar regras ou apagar auditoria.
+- A saída não mostra URI, nome do banco, documentos nem mensagens do driver.
 
-## Etapa 3.1 — autenticação isolada
-`MongoUserAuthenticator` valida credenciais da coleção `users` por `email_key` e `active=true`,
-confere o hash e retorna somente ObjectId hexadecimal, nome e perfil permitido.
-Entradas que não sejam texto, e-mail inválido e valores fora dos limites falham sem montar
-filtros Mongo com estruturas fornecidas pelo cliente. Usuário inexistente, inativo ou com
-credencial inválida não recebe identidade.
+## Transações e replica set
 
-Este componente ainda não está conectado ao login web, não cria sessão nem substitui o SQLite.
-As rotas e auditoria atuais dependem de IDs relacionais inteiros; a conexão só ocorrerá numa
-fatia coerente que porte também os consumidores da identidade, autorização, sessão e auditoria.
-O fluxo de justificativas e envio de e-mail permanece inalterado. O teste de autorização por
-rota e rotação de sessão pertence à integração HTTP futura, não a este adaptador isolado.
+O SAA grava em várias coleções numa mesma transação (por exemplo: chamada, faltas, avisos, filas e auditoria). O MongoDB só oferece isso em **replica set**; um servidor standalone não serve.
 
-## Etapa 3.2a — gravador de auditoria isolado
-`MongoOperationLogWriter` acrescenta registros em `operation_logs` sem oferecer edição ou
-exclusão. O ator usa ObjectId opcional, o ID da entidade é serializado como texto, e o instante
-é armazenado como data BSON UTC. Campos têm limites de tamanho; o documento não possui campos
-dedicados para hash, token ou corpo de mensagem. Chamadores devem manter esses valores fora de
-`details` e gravar somente contexto operacional redigido.
+Para desenvolvimento e CI, o `docker-compose.saa-mongodb.yml` sobe um replica set de um nó (`rs0`):
 
-O gravador não substitui `Helpers::audit(PDO)` nem está conectado às rotas. A escrita de um
-usuário e seu evento ainda não é atômica nesta fatia. Quando 3.2a foi concluída, o CRUD de
-usuários junto com auditoria aguardava transações testadas em replica set. A subetapa 3.2b
-prepara agora essa topologia e o teste; só após o CI passar será possível considerar esse gate
-técnico validado. A migração de sessão/rotas também espera que todos os serviços consumidores
-usem ObjectId e MongoDB, sem mistura com PDO/IDs inteiros.
-O contrato append-only limita a API do componente, não as permissões do usuário MongoDB. Antes
-da integração de runtime, restringir as permissões sobre `operation_logs` para impedir update e
-delete; validar também que cada chamador não inclua e-mail, token, hash ou conteúdo de mensagem
-em `details`.
+```sh
+docker compose -f docker-compose.saa-mongodb.yml up -d --wait
+```
 
-## Etapa 3.2b — base transacional
-A composição local e a CI sobem MongoDB 7 como replica set de um nó (`rs0`) e conectam com
-`replicaSet=rs0`. `MongoTransactionTest` grava usuário e evento em duas coleções, valida o
-rollback conjunto e depois confirma a gravação conjunta. Esta etapa prepara a primitiva para
-um CRUD futuro; o gravador aceita uma sessão opcional para participar da transação. A fatia
-testa o escritor e a coleção de usuários na mesma sessão, mas ainda não cria usuários pelo
-runtime nem ativa transações nas rotas da aplicação.
-Um replica set de um nó valida o contrato de transação; não representa alta disponibilidade.
-A configuração Compose é somente para desenvolvimento/CI, sem autenticação MongoDB e com a
-porta publicada apenas em loopback; não expor nem reutilizar em produção. O membro anuncia
-`127.0.0.1`, adequado para o PHP executado no host; clientes em containers precisarão de um
-hostname de rede apropriado na configuração de implantação.
-Para subir localmente e aguardar o primário ficar pronto antes dos testes, execute
-`docker compose -f docker-compose.saa-mongodb.yml up -d --wait`.
+Essa configuração não tem autenticação, publica a porta só em `127.0.0.1` e anuncia o membro como `127.0.0.1`, o que serve para o PHP rodando na mesma máquina. **Não use em produção.** Em produção, use um replica set com autenticação, TLS e, de preferência, três membros para alta disponibilidade. Aplicações em containers precisam de um nome de host acessível na rede deles.
 
-## Evidências e limites
-O workflow inclui lint e teste com MongoDB 7: documentos válidos por coleção,
-rejeição de inválidos, updates inválidos, índices únicos, normalização de e-mail,
-matrículas nulas, responsáveis com e-mail compartilhado, bootstrap repetido sem perda de dados
-e recusa de dados incompatíveis preexistentes.
-A fundação da etapa 2 (incluindo seed e health check CLI) passou no CI MongoDB 7, run #5. A etapa
-3.1 de autenticação isolada passou no run #9 e a etapa 3.2a append-only no run #13. A etapa 3.2b
-acrescenta o teste transacional; seu resultado precisa ser conferido no SHA candidato. Ainda
-restam os gates de runtime, autorização, paridade, migração e configuração de permissões.
+## Auditoria
+
+`MongoOperationLogWriter` só acrescenta registros em `operation_logs`; o código não oferece edição nem exclusão. Cada registro tem o usuário (ou nenhum, no caso do responsável), a ação, a entidade, o ID dela como texto, um detalhe curto e a data. Quem chama não deve colocar e-mail, link, hash ou texto de mensagem no detalhe.
+
+Essa garantia é do código, não do banco. Em produção, dê ao usuário MongoDB da aplicação apenas `insert` e `find` em `operation_logs`.
+
+## Testes do banco
+
+Cada teste cria um banco com nome aleatório e o apaga ao terminar; a base configurada em `MONGODB_DB` nunca é removida.
+
+| Teste | O que cobre |
+|---|---|
+| `MongoSmokeTest` | Conexão, seleção do banco, leitura e gravação. |
+| `MongoSchemaTest` | Validações, índices únicos, e-mail normalizado, matrícula nula, responsáveis com e-mail repetido, reexecução sem perda de dados e recusa de dados incompatíveis. |
+| `MongoAdminHealthTest` | Conta inicial única e health check. |
+| `MongoTransactionTest` | Gravação conjunta e desfazer conjunto em duas coleções. |
+| `MongoUserAuthenticatorTest` | Login por `email_key`, conta inativa e senha errada. |
+| `MongoOperationLogWriterTest` | Auditoria só de acréscimo. |
+| `MongoSchoolDirectoryTest` | Cadastros, vínculos, arquivamento e permissões. |
+| `MongoAttendanceTest` | Chamada completa, faltas, filas, auditoria e desfazer em caso de erro. |
+| `MongoMailQueueTest` | Reserva, novas tentativas e entrega da fila de e-mail. |
+| `MongoJustificationTest` | Link, turma do dia e resposta única. |
+| `MongoPushTest` | Convites, escolha do canal, entrega, aparelho extinto, e-mail de reserva e lembrete. |
+| `MongoOccurrencesTest` | Lista, filtros, detalhe e reenvio. |
+
+Todos estão em `tests/Integration/Database/` e rodam no CI (`.github/workflows/saa-mongodb-foundation.yml`) com MongoDB 7 em replica set.

@@ -112,6 +112,7 @@ final class MongoOccurrences
                 'channel' => $communication['channel'] ?? 'EMAIL',
                 'failure_detail' => $communication['failure_detail'] ?? null,
                 'is_retry' => ($communication['retry_of_id'] ?? null) !== null,
+                'is_reminder' => ($communication['reminder_of_id'] ?? null) !== null,
                 'can_retry' => $communication['status'] === 'FALHA' && !isset($communication['retried_at'])
                     && !isset($retried[(string)$communication['_id']]),
             ], $communications),

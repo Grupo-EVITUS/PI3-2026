@@ -94,7 +94,7 @@ No modo MongoDB, o aviso de ausência chega ao celular Android do responsável c
    php bin/init_mongodb.php   # cria push_subscriptions, push_invites e push_queue
    ```
 
-2. **Workers**: execute o de push e mantenha o de e-mail para a reserva:
+2. **Workers**: execute o de push e mantenha o de e-mail para a reserva e os lembretes:
 
    ```powershell
    php bin/process_push_queue_mongodb.php --watch
@@ -113,6 +113,8 @@ No modo MongoDB, o aviso de ausência chega ao celular Android do responsável c
 | 404/410 | Aparelho desativado (permissão revogada ou app removido). |
 | 429/5xx ou rede | Nova tentativa com intervalo crescente, até 3 tentativas. |
 | Nenhum aparelho entregue | Aviso movido para `mail_queue` (`ENCAMINHADO_EMAIL`) na mesma transação. |
+
+**Lembrete por e-mail.** O 2xx do serviço de push indica que a mensagem foi aceita, não que foi lida. Se a ausência continuar sem justificativa `PUSH_EMAIL_REMINDER_HOURS` horas depois da entrega (padrão 24; `0` desliga; máximo 168), o mesmo worker de push cria uma nova comunicação por e-mail com link próprio, marcada como lembrete (`reminder_of_id`), e a põe na `mail_queue`. O lembrete é enviado uma única vez e é dispensado se a ausência já foi respondida ou se o responsável foi arquivado. Na tela da ausência ele aparece como “lembrete (push sem resposta)”.
 
 **Requisitos e segurança.**
 - O navegador só permite Web Push em **HTTPS** (ou `localhost`). Para testar num celular real, publique com HTTPS, por exemplo por um túnel, ou use o encaminhamento de portas do `chrome://inspect`.

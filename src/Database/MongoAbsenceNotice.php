@@ -13,7 +13,8 @@ use MongoDB\Driver\Session;
 /**
  * Cria a comunicação de uma ausência e põe o aviso na fila certa, dentro da transação de quem chama.
  * Responsável com aparelho inscrito recebe push (com e-mail de reserva); os demais, e-mail.
- * Usado pela chamada e pelo reenvio de comunicação que falhou.
+ * Usado pela chamada, pelo reenvio de comunicação que falhou e pelo lembrete por e-mail de um push
+ * entregue que ficou sem justificativa.
  */
 final class MongoAbsenceNotice
 {
@@ -32,11 +33,13 @@ final class MongoAbsenceNotice
 
     /**
      * @param array{_id: ObjectId, name: string, email: string} $guardian responsável ativo
+     * @param ObjectId|null $reminderOf comunicação por push sem resposta: força e-mail com texto de lembrete
      * @return string canal usado: PUSH ou EMAIL
      */
     public static function queue(
         Database $database, Session $session, array $guardian, ObjectId $absenceId, string $studentName,
-        string $className, string $absenceDate, string $baseUrl, UTCDateTime $now, ?ObjectId $retryOf = null
+        string $className, string $absenceDate, string $baseUrl, UTCDateTime $now, ?ObjectId $retryOf = null,
+        ?ObjectId $reminderOf = null
     ): string {
         if (!filter_var($guardian['email'], FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('E-mail de responsável inválido; chamada não registrada.');
@@ -44,7 +47,7 @@ final class MongoAbsenceNotice
         $options = ['session' => $session];
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         $communicationId = new ObjectId();
-        $usePush = $database->push_subscriptions->countDocuments(
+        $usePush = $reminderOf === null && $database->push_subscriptions->countDocuments(
             ['guardian_id' => $guardian['_id'], 'active' => true], $options
         ) > 0;
         $communication = [
@@ -55,15 +58,22 @@ final class MongoAbsenceNotice
         if ($retryOf !== null) {
             $communication['retry_of_id'] = $retryOf;
         }
+        if ($reminderOf !== null) {
+            $communication['reminder_of_id'] = $reminderOf;
+        }
         $database->communications->insertOne($communication, $options);
         $day = (new DateTimeImmutable($absenceDate))->format('d/m/Y');
         $path = '/justificar/' . rawurlencode($token);
+        $intro = $reminderOf === null
+            ? 'Informamos que ' . $studentName . ' não compareceu à turma ' . $className . ' em ' . $day . '.'
+            : 'Enviamos uma notificação ao seu celular sobre a ausência de ' . $studentName . ' na turma '
+                . $className . ' em ' . $day . ', mas ainda não recebemos a justificativa.';
         $email = [
             'recipient' => $guardian['email'],
-            'subject' => 'Comunicado de ausência — ' . $studentName,
-            'body' => 'Olá, ' . $guardian['name'] . ".\n\n"
-                . 'Informamos que ' . $studentName . ' não compareceu à turma ' . $className . ' em ' . $day
-                . ".\n\nPara enviar a justificativa, acesse o link individual:\n"
+            'subject' => ($reminderOf === null ? 'Comunicado de ausência — ' : 'Lembrete: comunicado de ausência — ')
+                . $studentName,
+            'body' => 'Olá, ' . $guardian['name'] . ".\n\n" . $intro
+                . "\n\nPara enviar a justificativa, acesse o link individual:\n"
                 . $baseUrl . $path
                 . "\n\nAtenciosamente,\nEquipe escolar",
         ];
@@ -76,6 +86,8 @@ final class MongoAbsenceNotice
                 'body' => $studentName . ' não compareceu à turma ' . $className
                     . ' em ' . $day . '. Toque para enviar a justificativa.',
                 'url' => $path, 'fallback_email' => $email,
+                // Endereço público do lembrete por e-mail, caso o push entregue fique sem resposta.
+                'base_url' => $baseUrl,
                 'status' => 'AGUARDANDO', 'created_at' => $now,
             ], $options);
             return 'PUSH';

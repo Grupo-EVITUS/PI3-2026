@@ -16,13 +16,35 @@ use function MongoDB\with_transaction;
  * Entrega a fila de push aos aparelhos do responsável. Sem aparelho que aceite a mensagem,
  * o aviso é encaminhado à fila de e-mail na mesma transação: o responsável nunca fica sem aviso.
  * Entrega ao menos uma vez; a tag da notificação (ID da comunicação) agrupa duplicatas no aparelho.
+ * O 2xx do serviço de push indica aceite, não leitura: se a ausência seguir sem justificativa
+ * depois de $reminderHours horas, o responsável recebe também um lembrete por e-mail.
  */
 final class MongoPushQueue
 {
     public const MAX_ATTEMPTS = 3;
+    public const DEFAULT_REMINDER_HOURS = 24;
+    public const MAX_REMINDER_HOURS = 168;
 
-    public function __construct(private readonly Database $database)
+    /** @param int $reminderHours horas até o lembrete por e-mail; 0 desliga o lembrete */
+    public function __construct(
+        private readonly Database $database, private readonly int $reminderHours = self::DEFAULT_REMINDER_HOURS
+    ) {
+        if ($reminderHours < 0 || $reminderHours > self::MAX_REMINDER_HOURS) {
+            throw new \InvalidArgumentException('Prazo do lembrete por e-mail inválido (0 a 168 horas).');
+        }
+    }
+
+    /** Lê PUSH_EMAIL_REMINDER_HOURS (padrão 24; 0 desliga). */
+    public static function reminderHoursFromEnvironment(): int
     {
+        $raw = getenv('PUSH_EMAIL_REMINDER_HOURS');
+        if ($raw === false || trim($raw) === '') {
+            return self::DEFAULT_REMINDER_HOURS;
+        }
+        if (preg_match('/^\d{1,3}$/', trim($raw)) !== 1 || (int)$raw > self::MAX_REMINDER_HOURS) {
+            throw new \InvalidArgumentException('PUSH_EMAIL_REMINDER_HOURS deve ser um número de 0 a 168.');
+        }
+        return (int)$raw;
     }
 
     /**
@@ -66,6 +88,93 @@ final class MongoPushQueue
             $processed++;
         }
         return $processed;
+    }
+
+    /**
+     * Lembrete por e-mail dos pushes entregues cujo prazo venceu sem justificativa.
+     * Cria nova comunicação por e-mail (novo link) ligada à do push por reminder_of_id;
+     * ausência já respondida, responsável arquivado ou sem dados para o link dispensam o lembrete.
+     */
+    public function remindUnanswered(int $limit = 20): int
+    {
+        if ($limit < 1 || $limit > 100) {
+            throw new \InvalidArgumentException('Limite de processamento inválido.');
+        }
+        $processed = 0;
+        for ($i = 0; $i < $limit; $i++) {
+            $job = $this->database->push_queue->findOne(
+                ['status' => 'CONCLUIDO', 'reminder_due_at' => ['$lte' => new UTCDateTime()]],
+                ['sort' => ['reminder_due_at' => 1, '_id' => 1]]
+            );
+            if ($job === null) {
+                break;
+            }
+            $session = $this->database->getManager()->startSession();
+            try {
+                with_transaction($session, function (Session $session) use ($job): void {
+                    $this->remind($job, $session);
+                });
+            } finally {
+                $session->endSession();
+            }
+            $processed++;
+        }
+        return $processed;
+    }
+
+    private function remind(array $job, Session $session): void
+    {
+        $options = ['session' => $session];
+        $now = new UTCDateTime();
+        // Trava contra dois workers: só um consegue apagar o prazo vencido.
+        if ($this->database->push_queue->updateOne(
+            ['_id' => $job['_id'], 'status' => 'CONCLUIDO', 'reminder_due_at' => ['$lte' => $now]],
+            ['$set' => ['reminder_due_at' => null]], $options
+        )->getMatchedCount() !== 1) {
+            return;
+        }
+        $communication = $this->database->communications->findOne(['_id' => $job['communication_id']], $options);
+        $absence = $communication === null ? null
+            : $this->database->absences->findOne(['_id' => $communication['absence_id']], $options);
+        $guardian = $this->database->guardians->findOne(['_id' => $job['guardian_id'], 'active' => true], $options);
+        $student = $absence === null ? null
+            : $this->database->students->findOne(['_id' => $absence['student_id']], $options);
+        $baseUrl = $job['base_url'] ?? null;
+
+        $reason = match (true) {
+            $absence === null || $student === null => 'Ausência não encontrada.',
+            $absence['status'] !== 'PENDENTE' => 'Ausência já respondida.',
+            $guardian === null => 'Responsável arquivado.',
+            !filter_var($guardian['email'], FILTER_VALIDATE_EMAIL) => 'E-mail do responsável inválido.',
+            !is_string($baseUrl) || $baseUrl === '' => 'Aviso sem endereço público para o link.',
+            default => null,
+        };
+        if ($reason === null) {
+            $className = null;
+            if (($absence['attendance_session_id'] ?? null) instanceof ObjectId) {
+                $className = $this->database->attendance_sessions->findOne(
+                    ['_id' => $absence['attendance_session_id']], $options
+                )['class_name'] ?? null;
+            }
+            if ($className === null && ($absence['class_id'] ?? null) instanceof ObjectId) {
+                $className = $this->database->classes->findOne(['_id' => $absence['class_id']], $options)['name'] ?? null;
+            }
+            MongoAbsenceNotice::queue(
+                $this->database, $session, $guardian, $absence['_id'], $student['name'],
+                $className ?? 'não informada', $absence['absence_date'], MongoAbsenceNotice::baseUrl($baseUrl), $now,
+                reminderOf: $communication['_id']
+            );
+        }
+        $this->database->push_queue->updateOne(
+            ['_id' => $job['_id']],
+            ['$set' => ['reminder_status' => $reason === null ? 'EMAIL_ENFILEIRADO' : 'DISPENSADO', 'base_url' => null]],
+            $options
+        );
+        (new MongoOperationLogWriter($this->database->operation_logs))->append(
+            null, $reason === null ? 'PUSH_LEMBRETE_EMAIL' : 'PUSH_LEMBRETE_DISPENSADO', 'comunicacao',
+            $job['communication_id'], $reason ?? 'Push entregue sem justificativa; lembrete enviado por e-mail.',
+            $session
+        );
     }
 
     /** @return array{delivered: list<ObjectId>, gone: list<ObjectId>, transient: int, permanent: int, detail: string} */
@@ -127,6 +236,11 @@ final class MongoPushQueue
         if (!$retry) {
             // Conteúdo com link de justificativa não fica na fila após o desfecho.
             $fields += ['body' => '', 'url' => '', 'fallback_email' => null];
+            $remind = $delivered && $this->reminderHours > 0;
+            $fields['reminder_due_at'] = $remind ? new UTCDateTime((time() + 3600 * $this->reminderHours) * 1000) : null;
+            if (!$remind) {
+                $fields['base_url'] = null;
+            }
         }
         $result = $this->database->push_queue->updateOne(
             ['_id' => $job['_id'], 'status' => 'PROCESSANDO', 'claim_id' => $claimId],

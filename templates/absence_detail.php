@@ -26,6 +26,7 @@
                                 <?= ($communication['channel'] ?? 'EMAIL') === 'PUSH' ? 'Notificação no celular' : 'E-mail' ?>
                                 · <?= e($communication['email_to']) ?>
                                 <?php if (!empty($communication['is_retry'])): ?> · reenvio<?php endif; ?>
+                                <?php if (!empty($communication['is_reminder'])): ?> · lembrete (push sem resposta)<?php endif; ?>
                             </small>
                             <?php if ($communication['failure_detail']): ?><small class="error-text"><?= e($communication['failure_detail']) ?></small><?php endif; ?>
                         </div>

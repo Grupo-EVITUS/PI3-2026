@@ -60,6 +60,9 @@ jobs:
       - name: Lint MongoDB schema and bootstrap
         run: |
           php -l src/Database/Schema.php
+          php -l src/Database/MongoFrequencyReport.php
+          php -l templates/frequency_dashboard.php
+          php -l tests/Integration/Database/MongoFrequencyReportTest.php
           php -l src/Database/DemoSchoolSeed.php
           php -l bin/seed_demo_mongodb.php
           php -l tests/Integration/Database/MongoDemoSchoolSeedTest.php
@@ -112,6 +115,8 @@ jobs:
         run: php tests/Unit/Push/WebPushDeliveryTest.php
       - name: Validate schema, indexes and idempotent bootstrap
         run: php tests/Integration/Database/MongoSchemaTest.php
+      - name: Validate MongoDB frequency aggregates
+        run: php tests/Integration/Database/MongoFrequencyReportTest.php
       - name: Validate isolated demonstration data
         run: php tests/Integration/Database/MongoDemoSchoolSeedTest.php
       - name: Validate isolated SQLite historical import and quarantine

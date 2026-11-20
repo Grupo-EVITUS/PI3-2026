@@ -54,7 +54,7 @@ $bandLabel = ['green' => 'Verde', 'yellow' => 'Amarelo', 'red' => 'Vermelho', 'n
         <?php foreach ($report['classes'] as $row): ?>
             <tr><td><strong><?= e($row['name']) ?></strong></td><td><?= (int)$row['present'] ?></td><td><?= (int)$row['absent'] ?></td>
                 <td><span class="frequency-band band-<?= e($row['band']) ?>"><?= e($showRate($row['rate'])) ?> · <?= e($bandLabel[$row['band']] ?? 'Sem dados') ?></span></td>
-                <td><progress class="frequency-progress band-<?= e($row['band']) ?>" max="100" value="<?= e((string)($row['rate'] ?? 0)) ?>" aria-label="Frequência da turma <?= e($row['name']) ?>: <?= e($showRate($row['rate'])) ?>"></progress></td></tr>
+                <td><progress class="frequency-progress band-<?= e($row['band']) ?>" max="100" value="<?= e((string)($row['rate'] ?? 0)) ?>" aria-label="<?= $rawStudent === '' ? 'Frequência da turma' : 'Frequência do aluno na turma' ?> <?= e($row['name']) ?>: <?= e($showRate($row['rate'])) ?>"></progress></td></tr>
         <?php endforeach; ?>
         </tbody>
     </table></div>

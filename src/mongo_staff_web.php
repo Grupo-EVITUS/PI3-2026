@@ -7,6 +7,7 @@ use Saa\Database\Mongo;
 use Saa\Database\MongoStaffRegistration;
 use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\MongoAttendance;
+use Saa\Database\MongoFrequencyReport;
 use Saa\Database\MongoJustification;
 use Saa\Database\MongoPushSubscriptions;
 use Saa\Push\WebPush;
@@ -228,6 +229,61 @@ if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
         http_response_code(422);
         renderMongoAttendance($error->getMessage(), is_array($_POST['attendance'] ?? null) ? $_POST['attendance'] : []);
     }
+    return;
+}
+if ($path === '/frequencia' && $method === 'GET') {
+    Auth::requireRole(['COORDENACAO', 'DIRETOR']);
+    header('Cache-Control: no-store');
+    $database = Mongo::database();
+    $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+    if ($actor === null || $database->users->countDocuments([
+        '_id' => $actor, 'active' => true, 'profile' => ['$in' => ['COORDENACAO', 'DIRETOR']],
+    ]) !== 1) {
+        http_response_code(403);
+        render('error.php', ['title' => 'Acesso negado', 'message' => 'Seu acesso não está ativo.']);
+        return;
+    }
+    $period = $_GET['periodo'] ?? 'mes';
+    $reference = $_GET['referencia'] ?? date('Y-m-d');
+    $rawClass = $_GET['turma_id'] ?? '';
+    $rawStudent = $_GET['aluno_id'] ?? '';
+    if (!is_string($period) || !in_array($period, ['semana', 'mes', 'semestre'], true)
+        || !is_string($reference) || !Bson::isDay($reference)
+        || !is_string($rawClass) || !is_string($rawStudent)
+        || ($rawClass !== '' && Bson::objectId($rawClass) === null)
+        || ($rawStudent !== '' && Bson::objectId($rawStudent) === null)) {
+        http_response_code(422);
+        render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise período, data, turma e aluno.']);
+        return;
+    }
+    $day = new DateTimeImmutable($reference . 'T00:00:00Z');
+    if ($period === 'semana') {
+        $first = $day->modify('monday this week');
+        $last = $first->modify('+6 days');
+    } elseif ($period === 'mes') {
+        $first = $day->modify('first day of this month');
+        $last = $day->modify('last day of this month');
+    } else {
+        $half = (int)$day->format('n') <= 6 ? '01' : '07';
+        $first = new DateTimeImmutable($day->format('Y') . '-' . $half . '-01T00:00:00Z');
+        $last = $first->modify('+6 months -1 day');
+    }
+    $classId = $rawClass === '' ? null : Bson::objectId($rawClass);
+    $studentId = $rawStudent === '' ? null : Bson::objectId($rawStudent);
+    try {
+        $report = (new MongoFrequencyReport($database))->report(
+            $first->format('Y-m-d'), $last->format('Y-m-d'), $classId, $studentId
+        );
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        render('error.php', ['title' => 'Relatório indisponível', 'message' => $error->getMessage()]);
+        return;
+    }
+    $classes = $database->classes->find([], ['sort' => ['name' => 1], 'limit' => 1000])->toArray();
+    $students = $database->students->find([], ['sort' => ['name' => 1], 'limit' => 1000])->toArray();
+    render('frequency_dashboard.php', compact(
+        'report', 'classes', 'students', 'period', 'reference', 'rawClass', 'rawStudent', 'first', 'last'
+    ));
     return;
 }
 if (!in_array($path, ['/cadastros', '/cadastros/usuario', '/cadastros/turma', '/cadastros/aluno', '/cadastros/responsavel', '/cadastros/arquivar', '/cadastros/responsavel/notificacoes'], true)) {

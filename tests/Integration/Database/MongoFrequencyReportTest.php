@@ -76,6 +76,10 @@ try {
     if ($nearNinety['rate'] !== 89.9 || $nearNinety['band'] !== 'yellow') {
         throw new RuntimeException('Faixa não pode depender do percentual arredondado.');
     }
+    $nearEightyFive = $threshold->invoke($reporter, ['present' => 84995, 'absent' => 15005, 'total' => 100000]);
+    if ($nearEightyFive['rate'] !== 84.9 || $nearEightyFive['band'] !== 'red') {
+        throw new RuntimeException('Faixa vermelha não pode cruzar 85% após exibição.');
+    }
     foreach ([['2026-02-30', '2026-03-01'], ['2026-11-02', '2026-11-01']] as [$from, $to]) {
         try {
             $reporter->report($from, $to);

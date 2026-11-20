@@ -81,6 +81,16 @@ php bin/process_mail_queue_mongodb.php --watch
 
 O worker reivindica cada e-mail, tenta novamente falhas transitórias até três vezes com intervalo e ignora itens em `QUARENTENA`. Depois do SMTP, o responsável pode justificar pelo link individual. A entrega é **ao menos uma vez** se houver queda entre a aceitação do SMTP e a confirmação no banco. A importação de dados SQLite, a reconciliação e a troca operacional ainda não foram concluídas; mantenha a prévia desligada para uso escolar real até esses passos.
 
+### Dados fictícios para homologação MongoDB
+
+Depois de configurar `MONGODB_URI` e `MONGODB_DB`, crie uma base **nova e isolada** de demonstração com um comando explícito:
+
+```powershell
+php bin/seed_demo_mongodb.php --target-db=saa_demo_equipe --apply
+```
+
+O comando exige um nome `saa_demo_*`, diferente de `MONGODB_DB`, e recusa qualquer banco que já tenha coleções. Cria 2 turmas, 5 alunos, 3 responsáveis e 3 vínculos com e-mails `example.test`; dois alunos ficam sem responsável para conferir esse caso. Não cria usuários administradores, chamadas, ausências, filas nem inscrições push; não envia notificações. Uma segunda execução é recusada sem alterar os dados. Crie a conta da Coordenação nesse banco separadamente com `bin/create_initial_admin_mongodb.php`, usando senha definida em variável de ambiente e `MONGODB_DB=saa_demo_equipe` somente no ambiente de homologação. Não use este comando para carregar alunos reais nem publique a lista da escola no GitHub.
+
 ### Notificação push no Android (PWA)
 
 No modo MongoDB, o aviso de ausência chega ao celular Android do responsável como **notificação push**. O **e-mail continua como reserva**. Não há app de loja: o SAA é um PWA. O responsável abre um link no Chrome, toca em **Ativar notificações** e, se quiser, instala o atalho “Presença” na tela inicial. A notificação aparece na barra do Android, e o toque abre o formulário de justificativa.

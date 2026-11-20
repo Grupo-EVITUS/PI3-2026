@@ -49,8 +49,17 @@ status, result = request(coord, "/cadastros/usuario", dict(
     fields, email="diretor@example.org", profile="DIRETOR", csrf_token=csrf(result)))
 assert status == 200
 director = browser()
-assert login(director, "diretor@example.org")[0] == 403
+status, frequency_home = login(director, "diretor@example.org")
+assert status == 200 and "Frequência escolar" in frequency_home
 assert request(director, "/chamada")[0] == 403
+assert request(aoe, "/frequencia")[0] == 403
+assert request(browser(), "/frequencia")[0] == 200  # Redirect para login.
+assert request(coord, "/frequencia?periodo=invalido")[0] == 422
+assert request(coord, "/frequencia?turma_id=%24ne")[0] == 422
+status, empty_frequency = request(coord, "/frequencia?periodo=semana&referencia=2026-11-15")
+assert status == 200 and "Sem dados" in empty_frequency and "09/11/2026" in empty_frequency and "15/11/2026" in empty_frequency
+status, semester = request(coord, "/frequencia?periodo=semestre&referencia=2026-11-15")
+assert status == 200 and "01/07/2026" in semester and "31/12/2026" in semester
 
 assert 'action="/cadastros/turma"' in result
 status, result = request(coord, "/cadastros/turma", dict(
@@ -119,3 +128,7 @@ assert status == 200 and "Chamada registrada" in summary and "não envia avisos 
 assert "1 comunicação(ões) aguardam" in summary
 status, duplicate = request(aoe, "/chamada", full)
 assert status == 422 and "Já existe uma chamada" in duplicate
+status, frequency = request(coord, "/frequencia?periodo=mes&referencia=2026-11-15&turma_id=" + attendance_class)
+assert status == 200 and "Frequência por aluno" in frequency
+assert "50,0%" in frequency and "Aluno Chamada A" in frequency
+assert "chamada@example.org" not in frequency

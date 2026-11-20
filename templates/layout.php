@@ -36,6 +36,9 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
             <?php if (($_SESSION['profile'] ?? '') === 'COORDENACAO'): ?>
                 <a href="/cadastros">Cadastros</a>
             <?php endif; ?>
+            <?php if (getenv('SAA_WEB_MODE') === 'mongo_staff' && in_array($_SESSION['profile'] ?? '', ['COORDENACAO', 'DIRETOR'], true)): ?>
+                <a href="/frequencia">Frequência</a>
+            <?php endif; ?>
         </nav>
         <div class="user-menu">
             <span class="user-label"><?= e($_SESSION['user_name'] ?? '') ?><small><?= e($profileLabels[$_SESSION['profile'] ?? ''] ?? '') ?></small></span>

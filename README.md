@@ -91,6 +91,10 @@ php bin/seed_demo_mongodb.php --target-db=saa_demo_equipe --apply
 
 O comando exige um nome `saa_demo_*`, diferente de `MONGODB_DB`, e recusa qualquer banco que já tenha coleções. Cria 2 turmas, 5 alunos, 3 responsáveis e 3 vínculos com e-mails `example.test`; dois alunos ficam sem responsável para conferir esse caso. Não cria usuários administradores, chamadas, ausências, filas nem inscrições push; não envia notificações. Uma segunda execução é recusada sem alterar os dados. Crie a conta da Coordenação nesse banco separadamente com `bin/create_initial_admin_mongodb.php`, usando senha definida em variável de ambiente e `MONGODB_DB=saa_demo_equipe` somente no ambiente de homologação. Não use este comando para carregar alunos reais nem publique a lista da escola no GitHub.
 
+### Frequência em homologação MongoDB
+
+No modo `SAA_WEB_MODE=mongo_staff`, Coordenação e Direção podem consultar `/frequencia` por semana, mês ou semestre civil, selecionando data de referência, turma e aluno. O gráfico e a tabela mostram a mesma taxa: presenças divididas por presenças mais ausências em chamadas completas `CONCLUIDA`. A taxa da turma soma os registros de todos os alunos; se houver filtro de aluno, a comparação por turma considera apenas esse aluno. A transferência de turma conserva o snapshot da chamada. Chamadas incompletas e o histórico legado sem roster comprovado não compõem a taxa. Sem chamadas válidas, o resultado é “Sem dados”. Verde: a partir de 90%; amarelo: de 85% a menos de 90%; vermelho: abaixo de 85%. A apresentação trunca para uma casa decimal sem alterar a classificação exata. A revisão manual pela equipe e o cutover operacional permanecem pendentes.
+
 ### Notificação push no Android (PWA)
 
 No modo MongoDB, o aviso de ausência chega ao celular Android do responsável como **notificação push**. O **e-mail continua como reserva**. Não há app de loja: o SAA é um PWA. O responsável abre um link no Chrome, toca em **Ativar notificações** e, se quiser, instala o atalho “Presença” na tela inicial. A notificação aparece na barra do Android, e o toque abre o formulário de justificativa.

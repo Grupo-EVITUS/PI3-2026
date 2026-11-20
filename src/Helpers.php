@@ -17,6 +17,9 @@ function staffHomePath(): string
     if (getenv('SAA_WEB_MODE') !== 'mongo_staff') {
         return '/ocorrencias';
     }
+    if (($_SESSION['profile'] ?? '') === 'DIRETOR') {
+        return '/frequencia';
+    }
     return ($_SESSION['profile'] ?? '') === 'AOE' && mongoAttendancePreviewEnabled() ? '/chamada' : '/cadastros';
 }
 

@@ -69,7 +69,8 @@ try {
     rejects(fn() => $directory->list(profile: 'ADMIN'), 'Perfil arbitrário foi aceito.');
     rejects(fn() => $directory->list(profile: '$ne'), 'Operador no perfil foi aceito.');
     rejects(fn() => $directory->list(str_repeat('a', 101)), 'Busca longa foi aceita.');
-    rejects(fn() => $directory->list("ana\0"), 'Byte nulo foi aceito.');
+    rejects(fn() => $directory->list("a\0na"), 'Byte nulo foi aceito.');
+    check($names($directory->list("\0ana\n")) === ['Ana Souza'], 'Espaços e nulos nas pontas devem ser aparados.');
     rejects(fn() => $directory->list("\xff\xfe"), 'UTF-8 inválido foi aceito.');
 
     fwrite(STDOUT, "MongoStaffDirectoryTest: listagem, busca e filtros passaram.\n");

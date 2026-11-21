@@ -42,13 +42,16 @@ try {
     check($db->students->findOne(['_id' => $bia])['birth_date'] === null
         && $db->students->findOne(['_id' => $cai])['birth_date'] === null, 'Data ausente ou em branco deve ficar nula.');
     $before = $db->students->countDocuments();
-    foreach (['05/03/2014', '2014-02-30', '2014-13-01', '1899-12-31', date('Y-m-d', time() + 86400 * 2), 'abc', "2014-03-05\n"] as $bad) {
+    foreach (['05/03/2014', '2014-02-30', '2014-13-01', '1899-12-31', date('Y-m-d', time() + 86400 * 2), 'abc', "2014-03-\n05", '2014-3-5'] as $bad) {
         rejects(fn() => $directory->createStudent($actor, 'Invalido', null, $class, $bad), 'Data inválida aceita: ' . json_encode($bad));
         rejects(fn() => $directory->updateStudent($actor, $ana, 'Ana', 'M-1', $class, $bad), 'Edição aceitou data inválida: ' . json_encode($bad));
     }
     check($db->students->countDocuments() === $before
         && $db->students->findOne(['_id' => $ana])['birth_date'] === '2014-03-05',
         'Data inválida alterou ou criou cadastro.');
+    // Espaços e quebras de linha nas pontas são removidos, como nos demais campos de texto.
+    $padded = $directory->createStudent($actor, 'Com espaços', null, $class, " 2014-03-05\n");
+    check($db->students->findOne(['_id' => $padded])['birth_date'] === '2014-03-05', 'A data deveria ser aparada.');
     $directory->createStudent($actor, 'Hoje', null, $class, date('Y-m-d'));
     $directory->updateStudent($actor, $ana, 'Ana', 'M-1', $class, '2013-12-31');
     check($db->students->findOne(['_id' => $ana])['birth_date'] === '2013-12-31', 'Edição da data não persistiu.');

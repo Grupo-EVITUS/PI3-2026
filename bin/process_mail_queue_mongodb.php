@@ -10,8 +10,9 @@ if (strtolower(getenv('MAIL_MODE') ?: '') !== 'smtp') {
 }
 $watch = in_array('--watch', $argv, true);
 do {
-    $count = (new Saa\Database\MongoMailQueue(Saa\Database\Mongo::database()))
-        ->process('sendQueuedEmail');
+    $database = Saa\Database\Mongo::database();
+    $count = (new Saa\Database\MongoMailQueue($database))->process('sendQueuedEmail')
+        + (new Saa\Database\MongoPasswordReset($database))->deliver('sendQueuedEmail');
     if (!$watch) {
         echo "Mensagens processadas: $count\n";
         break;

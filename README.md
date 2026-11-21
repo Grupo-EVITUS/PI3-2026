@@ -51,7 +51,7 @@ Suba a aplicação e os workers em terminais separados, com as mesmas variáveis
 
 ```powershell
 php -S 127.0.0.1:8000 router.php           # aplicação web
-php bin/process_mail_queue_mongodb.php --watch   # fila de e-mail (MAIL_MODE=smtp)
+php bin/process_mail_queue_mongodb.php --watch   # fila de e-mail e de redefinição de senha (MAIL_MODE=smtp)
 php bin/process_push_queue_mongodb.php --watch   # fila de push (se houver VAPID)
 ```
 
@@ -77,6 +77,17 @@ Quando uma comunicação falha (`FALHA`), AOE e Coordenação podem **reenviar**
 ### Justificativa
 
 O token vai na comunicação, é guardado como hash e o conteúdo da mensagem é apagado da fila após o envio. A primeira justificativa recebida conclui a ocorrência; os demais links passam a exibir só a resposta registrada. O link não expira. Motivos: doença, consulta médica, problema familiar, problema de transporte e outro (obrigatória explicação).
+
+### Recuperação de senha
+
+Na tela de acesso, **Esqueci minha senha** (`/recuperar-senha`) pede o e-mail cadastrado. Só contas **ativas de AOE e Coordenação** recebem o link; o Diretor fica de fora e deve procurar a Coordenação (a lista de perfis está em `MongoPasswordReset::PROFILES`).
+
+- **Resposta sempre igual:** a tela e o tempo de resposta são os mesmos para e-mail cadastrado ou não, para não revelar quem tem conta.
+- **Link:** token de 256 bits, válido por **1 hora** e de **uso único**; só o hash fica no banco. Um novo pedido revoga os anteriores, e cada conta pode pedir no máximo **1 vez a cada 5 minutos**.
+- **Envio:** o e-mail entra na coleção `password_resets` e sai pelo worker de e-mail (`bin/process_mail_queue_mongodb.php`), com até 3 tentativas. O texto com o link é apagado do banco após o envio, a falha definitiva, o uso ou a revogação.
+- **Senha nova:** de 10 a 72 caracteres, com confirmação. Depois de salvar, a pessoa entra com a nova senha (não há login automático).
+- **Auditoria:** `SENHA_REDEFINICAO_SOLICITADA`, `SENHA_EMAIL_ENVIADO`, `SENHA_EMAIL_FALHA` e `SENHA_REDEFINIDA`, sem e-mail nem token nos detalhes.
+- **Limitação:** sessões já abertas da conta continuam válidas até expirarem; a redefinição não as encerra.
 
 ### E-mail
 
@@ -154,6 +165,6 @@ A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.g
 
 ## Fora do escopo atual
 
-Recuperação de senha, WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
+WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
 
 > O arquivo `saa_flask_mongodb_dashboard_atualizado.zip` e os diagramas são materiais anteriores do repositório.

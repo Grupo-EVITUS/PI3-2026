@@ -142,6 +142,17 @@ final class Schema
                  'attempts' => ['bsonType' => ['int', 'long']],
                  'failure_detail' => ['bsonType' => ['string', 'null']]]
             ),
+            Collections::PASSWORD_RESETS => $schema(
+                ['user_id', 'token_hash', 'created_at', 'expires_at', 'mail_status', 'mail'],
+                ['user_id' => $id, 'token_hash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
+                 'created_at' => $date, 'expires_at' => $date,
+                 'used_at' => $nullableDate, 'revoked_at' => $nullableDate,
+                 'mail_status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'FALHA']),
+                 'mail' => ['bsonType' => 'object', 'required' => ['recipient', 'subject', 'body'],
+                     'properties' => ['recipient' => $text, 'subject' => $text, 'body' => $text]],
+                 'attempts' => ['bsonType' => ['int', 'long']], 'started_at' => $nullableDate,
+                 'next_attempt_at' => $nullableDate, 'processed_at' => $nullableDate, 'claim_id' => $nullableId]
+            ),
             Collections::JUSTIFICATIONS => $schema(
                 ['absence_id', 'communication_id', 'guardian_id', 'reason', 'explanation', 'submitted_at'],
                 ['absence_id' => $id, 'communication_id' => $id, 'guardian_id' => $id,
@@ -216,6 +227,13 @@ final class Schema
                 ['key' => ['status' => 1, 'created_at' => 1], 'name' => 'push_queue_status_created'],
                 ['key' => ['status' => 1, 'next_attempt_at' => 1], 'name' => 'push_queue_retry_due'],
                 ['key' => ['status' => 1, 'started_at' => 1], 'name' => 'push_queue_stale_lease'],
+            ],
+            Collections::PASSWORD_RESETS => [
+                ['key' => ['token_hash' => 1], 'name' => 'password_reset_token_unique', 'unique' => true],
+                ['key' => ['user_id' => 1, 'created_at' => -1], 'name' => 'password_reset_user'],
+                ['key' => ['mail_status' => 1, 'created_at' => 1], 'name' => 'password_reset_mail_status'],
+                ['key' => ['mail_status' => 1, 'next_attempt_at' => 1], 'name' => 'password_reset_mail_retry'],
+                ['key' => ['mail_status' => 1, 'started_at' => 1], 'name' => 'password_reset_mail_lease'],
             ],
             Collections::JUSTIFICATIONS => [
                 ['key' => ['absence_id' => 1], 'name' => 'justification_absence_unique', 'unique' => true],

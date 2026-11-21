@@ -23,6 +23,6 @@
         <label for="password">Senha</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required>
         <button class="button button-primary button-full" type="submit">Entrar</button>
-        <p class="form-hint">O acesso é exclusivo para funcionários autorizados.</p>
+        <p class="form-hint">O acesso é exclusivo para funcionários autorizados. <a class="text-link" href="/recuperar-senha">Esqueci minha senha</a></p>
     </form>
 </section>

@@ -30,6 +30,9 @@ final class Collections
     public const PUSH_INVITES = 'push_invites';
     public const PUSH_QUEUE = 'push_queue';
 
+    // Redefinição de senha da equipe: token (hash) e o e-mail a entregar pelo worker.
+    public const PASSWORD_RESETS = 'password_resets';
+
     /** @return list<string> */
     public static function legacyImport(): array
     {

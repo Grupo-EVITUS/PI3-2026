@@ -10,6 +10,7 @@ use Saa\Database\MongoAttendance;
 use Saa\Database\MongoFrequencyReport;
 use Saa\Database\MongoJustification;
 use Saa\Database\MongoOccurrences;
+use Saa\Database\MongoPasswordReset;
 use Saa\Database\MongoPushSubscriptions;
 use Saa\Push\WebPush;
 use Saa\Database\Bson;
@@ -153,6 +154,57 @@ if ($path === '/logout') {
     $_SESSION = [];
     session_regenerate_id(true);
     Auth::redirect('/login');
+}
+if ($path === '/recuperar-senha') {
+    header('Cache-Control: no-store');
+    $sent = false;
+    $email = '';
+    if ($method === 'POST') {
+        requirePost();
+        $email = is_string($_POST['email'] ?? null) ? $_POST['email'] : '';
+        (new MongoPasswordReset(Mongo::database()))->request($email, baseUrl());
+        $sent = true;
+    }
+    render('password_forgot.php', ['sent' => $sent, 'email' => $sent ? '' : $email]);
+    return;
+}
+if (preg_match('#^/redefinir-senha/([A-Za-z0-9_-]+)$#', $path, $matches) === 1) {
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+    $token = $matches[1];
+    $service = new MongoPasswordReset(Mongo::database());
+    $account = $service->find($token);
+    if ($account === null) {
+        http_response_code(404);
+        render('error.php', ['title' => 'Link indisponível',
+            'message' => 'Este link é inválido, expirou ou já foi usado. Peça uma nova redefinição na tela de acesso.']);
+        return;
+    }
+    $error = null;
+    if ($method === 'POST') {
+        requirePost();
+        $password = $_POST['password'] ?? null;
+        try {
+            if (!is_string($password) || !is_string($_POST['password_confirmation'] ?? null)
+                || !hash_equals($password, $_POST['password_confirmation'])) {
+                throw new InvalidArgumentException('A confirmação não confere com a nova senha.');
+            }
+            $service->reset($token, $password);
+            flash('Senha redefinida. Entre com a nova senha.');
+            Auth::redirect('/login');
+        } catch (InvalidArgumentException $caught) {
+            http_response_code(422);
+            $error = $caught->getMessage();
+        } catch (DomainException) {
+            http_response_code(404);
+            render('error.php', ['title' => 'Link indisponível',
+                'message' => 'Este link é inválido, expirou ou já foi usado. Peça uma nova redefinição na tela de acesso.']);
+            return;
+        }
+    }
+    render('password_reset.php', ['name' => $account['name'], 'error' => $error,
+        'minLength' => MongoPasswordReset::MIN_PASSWORD_BYTES]);
+    return;
 }
 if ($path === '/notificacoes') {
     render('push_home.php');

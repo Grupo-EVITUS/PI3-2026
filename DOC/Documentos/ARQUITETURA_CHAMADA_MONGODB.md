@@ -21,7 +21,7 @@ a aceitação pelo servidor e a confirmação no banco.
 
 ## Escopo pendente
 
-Ainda não há recuperação de senha (issue #32), relatórios por ano e intervalo personalizado
+Ainda não há relatórios por ano e intervalo personalizado
 nem calendário letivo configurável.
 
 ## Modelo canônico da chamada

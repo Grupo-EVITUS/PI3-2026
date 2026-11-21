@@ -60,7 +60,7 @@ Acesse <http://127.0.0.1:8000>. Em produção, execute os workers como serviços
 ## Perfis e funcionalidades
 
 - **AOE:** faz a chamada da turma (`/chamada`), consulta ocorrências e reenvia comunicações com falha.
-- **Coordenação:** mesmos recursos da AOE; cadastros de turmas, alunos, responsáveis e vínculos; criação de usuários internos; convites de notificação; frequência.
+- **Coordenação:** mesmos recursos da AOE; cadastros de turmas, alunos, responsáveis e vínculos; criação e consulta de usuários internos; convites de notificação; frequência.
 - **Diretor:** somente leitura: frequência (`/frequencia`) e ocorrências (`/ocorrencias`).
 - **Responsável:** sem conta. Responde por link individual de alta entropia (`/justificar/{token}`), recebido por e-mail ou como notificação push no Android.
 
@@ -76,6 +76,10 @@ A Coordenação cadastra e edita turmas, alunos, responsáveis e vínculos em `/
 - **Telefone do responsável:** DDD + número (celular começa em 9), com ou sem máscara e com `+55` opcional. É guardado só com dígitos e exibido como `(11) 91234-5678`.
 
 Valores inválidos são recusados sem criar nem alterar o cadastro, e deixar o campo em branco o remove. O telefone é apenas um dado de contato: o aviso de ausência continua por notificação push ou e-mail.
+
+### Funcionários
+
+`/funcionarios` (só Coordenação) lista as contas internas, em ordem alfabética (até 200), com nome, e-mail, perfil, situação e data de cadastro. A busca procura o texto no nome ou no e-mail, sem diferenciar maiúsculas, e combina com os filtros de perfil e de situação (ativos ou inativos). O texto da busca é tratado como literal, nunca como expressão regular, e o hash da senha nunca é lido nem exibido. Para criar contas, use o cadastro de funcionário em `/cadastros`.
 
 ### Ocorrências
 

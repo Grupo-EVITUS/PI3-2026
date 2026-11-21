@@ -11,6 +11,7 @@ use Saa\Database\MongoFrequencyReport;
 use Saa\Database\MongoJustification;
 use Saa\Database\MongoOccurrences;
 use Saa\Database\MongoPasswordReset;
+use Saa\Database\MongoStaffDirectory;
 use Saa\Database\MongoPushSubscriptions;
 use Saa\Push\WebPush;
 use Saa\Database\Bson;
@@ -327,6 +328,41 @@ if ($path === '/ocorrencias' || preg_match('#^/ausencias/([a-f0-9]{24})$#', $pat
         notFound();
     }
     render('absence_detail.php', ['absence' => $absence, 'reasons' => MongoJustification::REASONS]);
+    return;
+}
+if ($path === '/funcionarios') {
+    Auth::requireRole(['COORDENACAO']);
+    if ($method !== 'GET') {
+        http_response_code(405);
+        header('Allow: GET');
+        return;
+    }
+    activeStaffId(['COORDENACAO']);
+    header('Cache-Control: no-store');
+    $filters = [];
+    foreach (['busca', 'perfil', 'situacao'] as $name) {
+        $value = $_GET[$name] ?? '';
+        if (!is_string($value) || strlen($value) > 200) {
+            http_response_code(422);
+            render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise a busca, o perfil e a situação.']);
+            return;
+        }
+        $filters[$name] = trim($value);
+    }
+    try {
+        if (!in_array($filters['situacao'], ['', 'ativos', 'inativos'], true)) {
+            throw new InvalidArgumentException('Situação inválida.');
+        }
+        $staff = (new MongoStaffDirectory(Mongo::database()))->list(
+            $filters['busca'], $filters['perfil'] === '' ? null : $filters['perfil'],
+            $filters['situacao'] === '' ? null : $filters['situacao'] === 'ativos'
+        );
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        render('error.php', ['title' => 'Filtros inválidos', 'message' => $error->getMessage()]);
+        return;
+    }
+    render('staff_list.php', ['staff' => $staff, 'filters' => $filters, 'limit' => MongoStaffDirectory::LIMIT]);
     return;
 }
 if ($path === '/comunicacoes/reenvio') {

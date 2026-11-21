@@ -30,6 +30,7 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
             <?php endif; ?>
             <?php if (($_SESSION['profile'] ?? '') === 'COORDENACAO'): ?>
                 <a href="/cadastros">Cadastros</a>
+                <a href="/funcionarios">Funcionários</a>
             <?php endif; ?>
             <?php if (in_array($_SESSION['profile'] ?? '', ['COORDENACAO', 'DIRETOR'], true)): ?>
                 <a href="/frequencia">Frequência</a>

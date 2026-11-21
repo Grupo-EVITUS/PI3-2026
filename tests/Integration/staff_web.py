@@ -185,3 +185,24 @@ for bad in ["abc", "12345", "(01) 91234-5678", "11 81234-5678"]:
 status, result = request(coord, "/cadastros/responsavel", dict(base_guardian, phone="+55 (11) 91234-5678"))
 assert status == 200 and "Responsável Fone · fone@example.org · (11) 91234-5678" in result
 assert request(aoe, "/cadastros/aluno", dict(base_student, birth_date="2014-03-05", csrf_token=csrf(attendance_page)))[0] == 403
+
+# Listagem de funcionários: só a Coordenação; nunca expõe senha; busca e filtros validados.
+status, staff_page = request(coord, "/funcionarios")
+assert status == 200 and "3 funcionário(s)" in staff_page and 'href="/funcionarios"' in staff_page
+for address in ["coord@example.org", "aoe@example.org", "diretor@example.org"]:
+    assert address in staff_page, address
+assert "password" not in staff_page.lower().replace('type="password"', "") and "$2y$" not in staff_page
+status, found = request(coord, "/funcionarios?busca=DIRETOR")
+assert status == 200 and "1 funcionário(s)" in found and "diretor@example.org" in found and "aoe@example.org" not in found
+status, found = request(coord, "/funcionarios?perfil=AOE")
+assert status == 200 and "1 funcionário(s)" in found and "aoe@example.org" in found
+status, found = request(coord, "/funcionarios?situacao=inativos")
+assert status == 200 and "Nenhum funcionário encontrado" in found
+status, found = request(coord, "/funcionarios?busca=.*")
+assert status == 200 and "Nenhum funcionário encontrado" in found
+for bad in ["perfil=ADMIN", "situacao=talvez", "busca%5B%5D=x", "perfil=%24ne"]:
+    assert request(coord, "/funcionarios?" + bad)[0] == 422, bad
+assert request(aoe, "/funcionarios")[0] == 403
+assert request(director, "/funcionarios")[0] == 403
+assert request(browser(), "/funcionarios")[0] == 200  # Redirect para login.
+assert request(coord, "/funcionarios", {"csrf_token": csrf(staff_page)})[0] == 405

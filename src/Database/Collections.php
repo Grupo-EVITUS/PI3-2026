@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Saa\Database;
 
 /**
- * Nomes de coleções compatíveis com o contrato SQLite que será importado na etapa 4.
- * attendance_sessions guarda a chamada completa no MongoDB, separada da importação legada.
+ * Nomes das coleções do SAA no MongoDB.
+ * attendance_sessions guarda a chamada completa da turma.
  */
 final class Collections
 {

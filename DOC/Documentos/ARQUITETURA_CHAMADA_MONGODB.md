@@ -1,67 +1,28 @@
-# Chamada completa do SAA em MongoDB
-
-**Status:** implementação em homologação; migração e cutover pendentes
+**Status:** implementada; MongoDB é o único armazenamento do SAA
 **Issue:** #46
 
-**Contrato de persistência:** `attendance_sessions` já possui validação de BSON,
+**Contrato de persistência:** `attendance_sessions` possui validação de BSON,
 índice único por `class_id`/`attendance_date` e índice de consulta por data/status.
-`absences.attendance_session_id` é opcional para preservar ocorrências legadas.
-Esse contrato preserva a compatibilidade de ocorrências legadas.
+`absences.attendance_session_id` aponta para a chamada que originou a ausência.
 
 O serviço `MongoAttendance::record` registra, em uma transação no replica set,
 o roster completo, ausências, auditoria, comunicações e e-mails na fila. Ele
 rejeita chamadas repetidas e alterações concorrentes de turma/aluno/vínculo.
 A gravação não envia SMTP dentro da requisição; o worker separado processa a
-fila. O modo SQLite continua atendendo o fluxo operacional até o cutover ensaiado.
+fila.
 
-A rota `/chamada` existe apenas para homologação quando
-`SAA_WEB_MODE=mongo_staff` e `SAA_MONGO_ATTENDANCE_PREVIEW=true` são configurados
-explicitamente. Ela autentica AOE/Coordenação, revalida a conta ativa, exige
-CSRF e usa o serviço transacional. O padrão continua desligado. A interface
-avisa que a comunicação fica na fila até o worker SMTP processá-la. O worker
-`bin/process_mail_queue_mongodb.php` requer `MAIL_MODE=smtp`; recupera reservas
-antigas e ignora filas em quarentena. Após SMTP, o link individual é validado
-pela rota pública `/justificar/{token}` e grava a resposta em transação.
-O teste HTTP/SMTP com Mailpit é o gate desta entrega. A entrega SMTP segue
-semântica ao menos uma vez se houver queda entre aceitação pelo servidor e
-confirmação no banco. O cutover operacional continua separado.
+A rota `/chamada` autentica AOE/Coordenação, revalida a conta ativa, exige
+CSRF e usa o serviço transacional. O worker `bin/process_mail_queue_mongodb.php`
+requer `MAIL_MODE=smtp`; recupera reservas antigas e ignora filas em quarentena.
+Após o SMTP, o link individual é validado pela rota pública `/justificar/{token}`
+e grava a resposta em transação. O teste HTTP/SMTP com Mailpit é o gate desta
+entrega. A entrega SMTP segue semântica ao menos uma vez se houver queda entre
+a aceitação pelo servidor e a confirmação no banco.
 
-O primeiro gate da migração histórica é `bin/prepare_sqlite_migration.php`:
-produz cópia SQLite consistente (`VACUUM INTO`) e manifesto sem dados pessoais,
-com hash SHA-256, contagens, integridade, referências e estados da fila. O
-comando não grava no MongoDB. `bin/import_sqlite_mongodb.php` faz dry-run sem
-escrita e importa a cópia aprovada em banco isolado. IDs são determinísticos,
-a retomada confere documentos e contagens, e a fila antiga fica em
-`QUARENTENA`. O teste automatizado reconstrói um segundo banco a partir da
-mesma cópia e confere IDs, documentos e quarentena. Ainda faltam a validação
-com dados reais, um ensaio de recuperação do ambiente operacional e o cutover.
-Nenhum status de presença anterior às chamadas existentes é presumido.
+## Escopo pendente
 
-## Diretriz de integração
-
-A aplicação executável na `main` usa PHP e SQLite; a branch `feat/php-mongodb` contém um rewrite PHP + MongoDB divergente e ainda registra ausências individuais. A PR #55 implementa chamada completa em SQLite. Ambas são referências para port seletivo; nenhuma será mesclada integralmente. A implementação trabalha na branch nova baseada na main atual, preservando os commits recentes de histórico, snapshot de turma e integridade.
-
-A mudança deve substituir o runtime de persistência de forma coerente. Não adicionar escrita/leitura Mongo enquanto auth, cadastros e ocorrências continuam lendo SQLite; dual-store criaria duas fontes de verdade. A chamada completa só será implementada depois do baseline Mongo passar pelos gates abaixo.
-
-## Plano em seis etapas
-
-### 1. Inventário, arquitetura e isolamento
-Concluídos no planejamento: comparar branches/PRs, atualizar a issue, criar `feat/saa-mongodb-complete-attendance` a partir da main e registrar riscos de incompatibilidade. A main não é alterada.
-
-### 2. Base MongoDB
-Portar dependências, configuração, cliente/conexão, inicialização, validators, índices, seed inicial seguro e health check interno. Fixar versão/topologia Mongo e preparar CI compatível. Gate: bootstrap idempotente, conexão e testes de schema/seed/health check.
-
-### 3. Port do runtime e paridade
-Portar autenticação/permissões, cadastros, ocorrências/justificativas, notificações/fila, scripts, telas e testes. Sem SQLite+Mongo simultâneos. Gate: fluxos atuais equivalentes, lint, unit, integração Mongo, aceitação HTTP e CI.
-
-### 4. Migração de dados e cutover ensaiado
-Construir backup consistente e importador SQLite→Mongo com dry-run, IDs mapeados de forma retomável, sem envio de e-mail. Reconciliar contagens, referências, estados, datas e fila pendente; testar restauração e rollback. Não inventar valores ausentes nem presenças históricas. Cutover real depende de aprovação operacional.
-
-### 5. Chamada completa em MongoDB
-Implementar `attendance_sessions` com índice único por turma/data, roster completo validado pelo servidor, snapshots de turma/período e tratamento explícito de concorrência. Ocorrências e notificações usam outbox/projeções idempotentes com lease e retry. Gate: testes de roster, transferências, duplicidades, falhas parciais, retomada e comunicações.
-
-### 6. Dashboards, relatórios e pareceres
-Implementar visão da escola, gráfico individual e gráfico por turma com seletor dentro da seção Turmas; emitir relatórios por semana, mês, semestre, ano e intervalo personalizado, com calendário letivo configurável. Após regressão/CI aprovados, entregar relatórios separados de qualidade e arquitetura de dados, com evidências e limitações.
+Ainda não há recuperação de senha (issue #32), relatórios por ano e intervalo personalizado
+nem calendário letivo configurável.
 
 ## Modelo canônico da chamada
 
@@ -101,21 +62,6 @@ Esta abordagem evita depender de transações multi-documento. Se forem escolhid
 - Manter autorização e escopo da turma, CSRF nas ações web, auditoria de correções e proteção de tokens/PII em respostas e logs.
 - A chamada legada individual não pode converter presença em falta após uma sessão completa; qualquer correção posterior deve ser explícita e auditada.
 
-## Compatibilidade dos dados legados a resolver na etapa 2
-
-A estrutura SQLite atual não fornece alguns campos exigidos pelo modelo Mongo documentado na branch de referência. O importador e o runtime não devem preencher lacunas com dados inventados.
-
-| Dado | Situação no SQLite | Tratamento necessário |
-|---|---|---|
-| Data de nascimento e código escolar | `birth_date` não existe; `registration_no` é opcional | Preservar ausência/desconhecido; permitir configuração posterior e não bloquear a migração por valor fictício. |
-| Período letivo e matrícula histórica | Turmas têm `academic_year`, mas não datas de período; alunos guardam somente turma atual | Criar configuração explícita de calendário/matrícula; não usar 1º de janeiro, `created_at` ou turma atual como datas históricas presumidas. |
-| Snapshot de turma em faltas antigas | Migração 002 preenche faltas antigas usando a turma atual do aluno | Marcar a proveniência/limitação; só snapshots comprovadamente capturados podem ser tratados como históricos confiáveis. |
-| Responsáveis e vínculos | E-mail não é único; relacionamento fica na tabela de vínculo e o modelo de referência embute no máximo 3 vínculos por aluno | Detectar duplicatas/excessos, reconciliar sem descartar contatos e preservar vínculos por aluno. Não impor unicidade até deduplicação. |
-| Status de ausência | `PENDENTE`/`RESPONDIDA` descreve a justificativa | Migrar como status de ausência e estado de justificativa separados; falta justificada continua sendo falta nas métricas. |
-| Perfil e comunicação pendente | `DIRETOR` é somente leitura; corpo da fila pode conter token em claro | Mapear Diretor para perfil read-only; importar filas sem enviar e-mails e sem registrar tokens em claro nos logs. |
-
-O importador deve oferecer backup consistente, dry-run, mapeamento estável de IDs SQLite→ObjectId, importação em ordem de dependências, retomada, reconciliação de contagens/referências/estados, e teste de restauração. Ocorrências pré-existentes precisam ser reconhecidas por chave antes de criar projeções para não duplicar comunicação.
-
 ## Verificações obrigatórias da etapa 3
 
 - Roster total/parcial/excedente e matrícula com início/fim na data.
@@ -123,10 +69,9 @@ O importador deve oferecer backup consistente, dry-run, mapeamento estável de I
 - Duplicidade concorrente e hash idêntico/divergente.
 - Falhas entre sessão, projeção de ausência, fila e confirmação; retry não duplica.
 - Responsáveis inelegíveis, comunicação falha e reenvio sem alteração da frequência.
-- Migração preserva ausência e justificativa antigas sem inferir presença ou disparar e-mail.
 - Autorização, CSRF, IDOR, validação de ObjectId, injeção NoSQL, PII/tokens e tamanho BSON.
 - Lint, unit, integração MongoDB e aceitação no SHA candidato; registrar a versão e topologia do Mongo usado.
 
 ## Limite deste documento
 
-Este é um plano revisado e não representa implementação concluída nem evidência de testes. A issue #46 permanece aberta; gráficos e relatórios por período são trabalho posterior, depois da base Mongo e da chamada completa.
+Descreve o desenho da chamada e não é evidência de testes. A issue #46 permanece aberta até a revisão da equipe.

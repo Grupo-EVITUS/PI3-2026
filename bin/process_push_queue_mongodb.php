@@ -7,10 +7,6 @@ use Saa\Database\Mongo;
 use Saa\Database\MongoPushQueue;
 use Saa\Push\WebPush;
 
-if (getenv('SAA_WEB_MODE') !== 'mongo_staff') {
-    fwrite(STDERR, "Configure SAA_WEB_MODE=mongo_staff para o worker de push.\n");
-    exit(1);
-}
 try {
     $pusher = WebPush::fromEnvironment();
 } catch (Throwable $error) {

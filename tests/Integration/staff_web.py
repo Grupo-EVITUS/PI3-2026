@@ -132,3 +132,36 @@ status, frequency = request(coord, "/frequencia?periodo=mes&referencia=2026-11-1
 assert status == 200 and "Frequência por aluno" in frequency
 assert "50,0%" in frequency and "Aluno Chamada A" in frequency
 assert "chamada@example.org" not in frequency
+
+# Ocorrências: o Diretor consulta; o reenvio é restrito à AOE/Coordenação e valida a comunicação.
+status, occurrences = request(director, "/ocorrencias")
+assert status == 200 and "Aluno Chamada A" in occurrences and "Pendente" in occurrences
+assert "Fazer chamada" not in occurrences
+assert request(director, "/ocorrencias?status=RESPONDIDA")[0] == 200
+assert "Nenhuma ocorrência nesta lista" in request(director, "/ocorrencias?status=RESPONDIDA")[1]
+assert request(director, "/ocorrencias?status=x")[0] == 422
+assert request(browser(), "/ocorrencias")[0] == 200  # Redirect para login.
+absence_id = re.search(r'href="/ausencias/([a-f0-9]{24})"', occurrences)[1]
+status, detail = request(director, "/ausencias/" + absence_id)
+assert status == 200 and "Aluno Chamada A" in detail and "Aguardando resposta" in detail
+assert "Contato da chamada" in detail and "Reenviar" not in detail
+assert request(director, "/ausencias/" + "0" * 24)[0] == 404
+assert request(director, "/ausencias/nao-e-um-id")[0] == 404
+assert request(director, "/comunicacoes/reenvio", {"communication_id": "0" * 24})[0] == 400
+assert request(director, "/comunicacoes/reenvio", dict(
+    communication_id="0" * 24, csrf_token=csrf(occurrences)))[0] == 403
+status, retried = request(aoe, "/comunicacoes/reenvio", dict(
+    communication_id="0" * 24, csrf_token=csrf(attendance_page)))
+assert status == 200 and "Comunicação não encontrada." in retried
+
+# Filtros por turma, aluno e período; entradas inválidas são recusadas antes do banco.
+status, filtered = request(director, "/ocorrencias?status=PENDENTE&turma_id=%s&aluno_id=%s&de=2026-11-15&ate=2026-11-15" % (
+    attendance_class, first_id))
+assert status == 200 and filtered.count('href="/ausencias/') == 1 and "1 ocorrência(s)" in filtered
+assert "Resultado da busca" in filtered and 'href="/ocorrencias">Limpar' in filtered
+status, none = request(director, "/ocorrencias?de=2026-11-16")
+assert status == 200 and '/ausencias/' not in none and "Ajuste ou limpe os filtros" in none
+status, none = request(director, "/ocorrencias?turma_id=" + class_id)
+assert status == 200 and '/ausencias/' not in none
+for bad in ["turma_id=%24ne", "aluno_id=abc", "de=2026-11-20&ate=2026-11-01", "de=2026-02-30", "de%5B%5D=x"]:
+    assert request(director, "/ocorrencias?" + bad)[0] == 422, bad

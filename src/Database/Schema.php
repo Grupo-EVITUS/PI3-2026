@@ -159,7 +159,7 @@ final class Schema
     public static function indexes(): array
     {
         return [
-            // ASCII NOCASE do SQLite é preservado por email_key, calculado pelo runtime/importador.
+            // E-mails são únicos sem diferenciar A-Z/a-z, via email_key calculado por Schema::emailKey.
             Collections::USERS => [
                 ['key' => ['email_key' => 1], 'name' => 'users_email_key_unique', 'unique' => true],
                 ['key' => ['is_initial_admin' => 1], 'name' => 'users_initial_admin_unique', 'unique' => true,
@@ -226,7 +226,7 @@ final class Schema
         ];
     }
 
-    /** SQLite NOCASE dobra somente A-Z; não altera caracteres não ASCII. */
+    /** Dobra somente A-Z; não altera caracteres não ASCII. */
     public static function emailKey(string $email): string
     {
         return strtr($email, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');

@@ -153,3 +153,15 @@ assert request(director, "/comunicacoes/reenvio", dict(
 status, retried = request(aoe, "/comunicacoes/reenvio", dict(
     communication_id="0" * 24, csrf_token=csrf(attendance_page)))
 assert status == 200 and "Comunicação não encontrada." in retried
+
+# Filtros por turma, aluno e período; entradas inválidas são recusadas antes do banco.
+status, filtered = request(director, "/ocorrencias?status=PENDENTE&turma_id=%s&aluno_id=%s&de=2026-11-15&ate=2026-11-15" % (
+    attendance_class, first_id))
+assert status == 200 and filtered.count('href="/ausencias/') == 1 and "1 ocorrência(s)" in filtered
+assert "Resultado da busca" in filtered and 'href="/ocorrencias">Limpar' in filtered
+status, none = request(director, "/ocorrencias?de=2026-11-16")
+assert status == 200 and '/ausencias/' not in none and "Ajuste ou limpe os filtros" in none
+status, none = request(director, "/ocorrencias?turma_id=" + class_id)
+assert status == 200 and '/ausencias/' not in none
+for bad in ["turma_id=%24ne", "aluno_id=abc", "de=2026-11-20&ate=2026-11-01", "de=2026-02-30", "de%5B%5D=x"]:
+    assert request(director, "/ocorrencias?" + bad)[0] == 422, bad

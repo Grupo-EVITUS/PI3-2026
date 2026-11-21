@@ -26,19 +26,43 @@ final class MongoOccurrences
     }
 
     /**
-     * Ocorrências mais recentes primeiro, até LIMIT registros.
+     * Ocorrências mais recentes primeiro, até LIMIT registros. Todos os filtros são opcionais e
+     * combinados com E. A turma filtrada é a da chamada (snapshot gravado na ausência) e o
+     * período usa o dia da ausência, inclusive nas duas pontas (AAAA-MM-DD).
      *
      * @return list<array{id: string, absence_date: string, status: string, student_name: string,
      *   class_name: string, reason: ?string, explanation: ?string, communication_count: int, failed_count: int}>
      */
-    public function list(?string $status = null): array
-    {
+    public function list(
+        ?string $status = null, ?ObjectId $classId = null, ?ObjectId $studentId = null,
+        ?string $from = null, ?string $to = null
+    ): array {
         if ($status !== null && !in_array($status, ['PENDENTE', 'RESPONDIDA'], true)) {
             throw new InvalidArgumentException('Filtro de status inválido.');
         }
+        foreach (['inicial' => $from, 'final' => $to] as $label => $day) {
+            if ($day !== null && !Bson::isDay($day)) {
+                throw new InvalidArgumentException('Data ' . $label . ' inválida.');
+            }
+        }
+        if ($from !== null && $to !== null && $from > $to) {
+            throw new InvalidArgumentException('A data inicial não pode ser posterior à data final.');
+        }
+        $filter = [];
+        if ($status !== null) {
+            $filter['status'] = $status;
+        }
+        if ($classId !== null) {
+            $filter['class_id'] = $classId;
+        }
+        if ($studentId !== null) {
+            $filter['student_id'] = $studentId;
+        }
+        if ($from !== null || $to !== null) {
+            $filter['absence_date'] = array_filter(['$gte' => $from, '$lte' => $to], static fn($v) => $v !== null);
+        }
         $absences = $this->database->absences->find(
-            $status === null ? [] : ['status' => $status],
-            ['sort' => ['absence_date' => -1, '_id' => -1], 'limit' => self::LIMIT]
+            $filter, ['sort' => ['absence_date' => -1, '_id' => -1], 'limit' => self::LIMIT]
         )->toArray();
         if ($absences === []) {
             return [];

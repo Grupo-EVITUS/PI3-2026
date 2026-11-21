@@ -153,7 +153,44 @@ try {
         || $brunoDetail['justification']['submitted_at'] === null) {
         throw new RuntimeException('O detalhe não mostra a justificativa.');
     }
-    fwrite(STDOUT, "MongoOccurrencesTest: lista, detalhe, snapshot e reenvio passaram.\n");
+
+    // Filtros por turma, aluno e período (dia da ausência, extremos inclusivos).
+    $classB = $directory->createClass($actor, 'Turma B', '6º', 2026, 'Tarde');
+    $carla = $directory->createStudent($actor, 'Carla', null, $classB);
+    $directory->createGuardian($actor, 'Mãe da Carla', 'maec@example.org', 'Mãe', [$carla]);
+    $attendance = new MongoAttendance($db);
+    $attendance->record($actor, $classB, [(string)$carla => 'AUSENTE'], '2026-11-20', 'https://escola.example.org');
+    $attendance->record($actor, $class, [(string)$alice => 'AUSENTE', (string)$bruno => 'PRESENTE'],
+        '2026-11-18', 'https://escola.example.org');
+    $summary = static fn(array $rows): array => array_map(
+        static fn(array $r): string => $r['student_name'] . ':' . $r['absence_date'], $rows
+    );
+    if ($summary($service->list())[0] !== 'Carla:2026-11-20' || $summary($service->list())[1] !== 'Alice:2026-11-18'
+        || count($service->list()) !== 4) {
+        throw new RuntimeException('A listagem completa deve vir da data mais recente para a mais antiga.');
+    }
+    $countOf = static fn(array $rows): int => count($rows);
+    $checks = [
+        'turma A' => [$countOf($service->list(classId: $class)), 3],
+        'turma B' => [$summary($service->list(classId: $classB)), ['Carla:2026-11-20']],
+        'aluno' => [$countOf($service->list(studentId: $alice)), 2],
+        'a partir de' => [$summary($service->list(from: '2026-11-16')), ['Carla:2026-11-20', 'Alice:2026-11-18']],
+        'até' => [$countOf($service->list(to: '2026-11-15')), 2],
+        'um dia' => [$summary($service->list(from: '2026-11-18', to: '2026-11-18')), ['Alice:2026-11-18']],
+        'respondidas da turma A' => [$summary($service->list('RESPONDIDA', $class)), ['Bruno:2026-11-15']],
+        'combinado' => [$summary($service->list('PENDENTE', $class, $alice, '2026-11-16')), ['Alice:2026-11-18']],
+        'sem resultado' => [$service->list(classId: $classB, studentId: $alice), []],
+    ];
+    foreach ($checks as $label => [$actual, $expected]) {
+        if ($actual !== $expected) {
+            throw new RuntimeException('Filtro "' . $label . '" retornou ' . json_encode($actual) . '.');
+        }
+    }
+    foreach ([['2026-11-20', '2026-11-01'], ['2026-02-30', null], ['abc', null], [null, '2026-13-01']] as [$from, $to]) {
+        expectThrows(InvalidArgumentException::class, fn() => $service->list(from: $from, to: $to),
+            'Período inválido foi aceito: ' . json_encode([$from, $to]));
+    }
+    fwrite(STDOUT, "MongoOccurrencesTest: lista, filtros, detalhe, snapshot e reenvio passaram.\n");
 } finally {
     $db->drop();
 }

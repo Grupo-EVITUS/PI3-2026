@@ -70,7 +70,7 @@ A chamada informa a situação de **todos** os alunos ativos da turma na data. O
 
 ### Ocorrências
 
-`/ocorrencias` lista as ausências (as 200 mais recentes) com a turma da chamada, o número de comunicações, falhas e a justificativa, com filtro por status (todas, pendentes, respondidas). `/ausencias/{id}` mostra o detalhe: comunicações por responsável (canal e situação), quem registrou e a justificativa.
+`/ocorrencias` lista as ausências (as 200 mais recentes) com a turma da chamada, o número de comunicações, falhas e a justificativa, com filtros combináveis por **status, turma, aluno e período** (datas inicial e final, inclusive). A turma é a da chamada, então uma transferência não altera ocorrências antigas; turmas e alunos arquivados continuam disponíveis na consulta. `/ausencias/{id}` mostra o detalhe: comunicações por responsável (canal e situação), quem registrou e a justificativa.
 
 Quando uma comunicação falha (`FALHA`), AOE e Coordenação podem **reenviar** pelo detalhe. O reenvio cria uma nova comunicação por e-mail, com **novo link**, na fila; a anterior fica marcada como reenviada e não pode ser reenviada de novo. Não se reenvia ocorrência já respondida nem para responsável arquivado. O reenvio é auditado (`EMAIL_REENVIO_SOLICITADO`).
 
@@ -154,6 +154,6 @@ A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.g
 
 ## Fora do escopo atual
 
-Recuperação de senha, filtros por aluno, turma e período nas ocorrências, WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
+Recuperação de senha, WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
 
 > O arquivo `saa_flask_mongodb_dashboard_atualizado.zip` e os diagramas são materiais anteriores do repositório.

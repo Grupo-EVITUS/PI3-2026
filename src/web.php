@@ -232,15 +232,41 @@ if ($path === '/ocorrencias' || preg_match('#^/ausencias/([a-f0-9]{24})$#', $pat
     header('Cache-Control: no-store');
     $occurrences = new MongoOccurrences(Mongo::database());
     if ($path === '/ocorrencias') {
-        $status = $_GET['status'] ?? '';
-        if (!is_string($status) || !in_array($status, ['', 'PENDENTE', 'RESPONDIDA'], true)) {
+        $filters = [];
+        foreach (['status', 'turma_id', 'aluno_id', 'de', 'ate'] as $name) {
+            $value = $_GET[$name] ?? '';
+            if (!is_string($value) || strlen($value) > 40) {
+                http_response_code(422);
+                render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise status, turma, aluno e período.']);
+                return;
+            }
+            $filters[$name] = trim($value);
+        }
+        $classId = $filters['turma_id'] === '' ? null : Bson::objectId($filters['turma_id']);
+        $studentId = $filters['aluno_id'] === '' ? null : Bson::objectId($filters['aluno_id']);
+        if (!in_array($filters['status'], ['', 'PENDENTE', 'RESPONDIDA'], true)
+            || ($filters['turma_id'] !== '' && $classId === null)
+            || ($filters['aluno_id'] !== '' && $studentId === null)) {
             http_response_code(422);
-            render('error.php', ['title' => 'Filtro inválido', 'message' => 'Use todas, pendentes ou respondidas.']);
+            render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise status, turma, aluno e período.']);
             return;
         }
+        try {
+            $rows = $occurrences->list(
+                $filters['status'] === '' ? null : $filters['status'], $classId, $studentId,
+                $filters['de'] === '' ? null : $filters['de'], $filters['ate'] === '' ? null : $filters['ate']
+            );
+        } catch (InvalidArgumentException $error) {
+            http_response_code(422);
+            render('error.php', ['title' => 'Filtros inválidos', 'message' => $error->getMessage()]);
+            return;
+        }
+        $database = Mongo::database();
         render('occurrences.php', [
-            'occurrences' => $occurrences->list($status === '' ? null : $status),
-            'activeStatus' => $status, 'reasons' => MongoJustification::REASONS, 'limit' => MongoOccurrences::LIMIT,
+            'occurrences' => $rows, 'filters' => $filters, 'reasons' => MongoJustification::REASONS,
+            'limit' => MongoOccurrences::LIMIT,
+            'classes' => $database->classes->find([], ['sort' => ['name' => 1], 'limit' => 1000])->toArray(),
+            'students' => $database->students->find([], ['sort' => ['name' => 1], 'limit' => 1000])->toArray(),
         ]);
         return;
     }

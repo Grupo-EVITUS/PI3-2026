@@ -462,7 +462,7 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
     requirePost();
     try {
         $values = [];
-        foreach (['name', 'grade', 'shift', 'registration_no', 'email', 'relationship', 'class_id'] as $field) {
+        foreach (['name', 'grade', 'shift', 'registration_no', 'email', 'relationship', 'class_id', 'birth_date', 'phone'] as $field) {
             $values[$field] = $_POST[$field] ?? '';
         }
         foreach ($values as $value) {
@@ -508,9 +508,9 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
                 throw new InvalidArgumentException('Turma inválida.');
             }
             if ($targetId === null) {
-                $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId);
+                $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId, $values['birth_date']);
             } else {
-                $directory->updateStudent($actor, $targetId, $values['name'], $values['registration_no'], $classId);
+                $directory->updateStudent($actor, $targetId, $values['name'], $values['registration_no'], $classId, $values['birth_date']);
             }
         } else {
             $studentIds = $_POST['student_ids'] ?? [];
@@ -526,9 +526,9 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
                 $ids[] = $id;
             }
             if ($targetId === null) {
-                $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids);
+                $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids, $values['phone']);
             } else {
-                $directory->updateGuardian($actor, $targetId, $values['name'], $values['email'], $values['relationship'], $ids);
+                $directory->updateGuardian($actor, $targetId, $values['name'], $values['email'], $values['relationship'], $ids, $values['phone']);
             }
         }
         flash('Cadastro escolar salvo.');

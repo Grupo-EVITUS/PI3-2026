@@ -165,3 +165,23 @@ status, none = request(director, "/ocorrencias?turma_id=" + class_id)
 assert status == 200 and '/ausencias/' not in none
 for bad in ["turma_id=%24ne", "aluno_id=abc", "de=2026-11-20&ate=2026-11-01", "de=2026-02-30", "de%5B%5D=x"]:
     assert request(director, "/ocorrencias?" + bad)[0] == 422, bad
+
+# Data de nascimento do aluno e telefone do responsável pela tela de cadastros.
+status, directory = request(coord, "/cadastros")
+assert status == 200 and 'name="birth_date"' in directory and 'name="phone"' in directory
+token = csrf(directory)
+base_student = dict(name="Aluno Nascimento", registration_no="NS-001", class_id=attendance_class, csrf_token=token)
+for bad in ["05/03/2014", "2014-02-30", "1899-12-31", "2999-01-01"]:
+    status, result = request(coord, "/cadastros/aluno", dict(base_student, birth_date=bad))
+    assert status == 422 and "Data de nascimento inválida" in result, bad
+status, result = request(coord, "/cadastros/aluno", dict(base_student, birth_date="2014-03-05"))
+assert status == 200 and "Aluno Nascimento · nasc. 05/03/2014" in result
+birth_student = re.search(r'value="([a-f0-9]{24})"> Aluno Nascimento', result)[1]
+base_guardian = {"name": "Responsável Fone", "email": "fone@example.org", "relationship": "Pai",
+                 "student_ids[]": birth_student, "csrf_token": csrf(result)}
+for bad in ["abc", "12345", "(01) 91234-5678", "11 81234-5678"]:
+    status, result = request(coord, "/cadastros/responsavel", dict(base_guardian, phone=bad))
+    assert status == 422 and "Telefone inválido" in result, bad
+status, result = request(coord, "/cadastros/responsavel", dict(base_guardian, phone="+55 (11) 91234-5678"))
+assert status == 200 and "Responsável Fone · fone@example.org · (11) 91234-5678" in result
+assert request(aoe, "/cadastros/aluno", dict(base_student, birth_date="2014-03-05", csrf_token=csrf(attendance_page)))[0] == 403

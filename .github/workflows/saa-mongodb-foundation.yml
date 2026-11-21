@@ -105,6 +105,8 @@ jobs:
           python3 tests/Integration/password_reset.py
       - name: Validate MongoDB school directory
         run: php tests/Integration/Database/MongoSchoolDirectoryTest.php
+      - name: Validate student birth date and guardian phone
+        run: php tests/Integration/Database/MongoRegistrationFieldsTest.php
       - name: Validate password recovery (single use, expiry, revocation, worker)
         run: php tests/Integration/Database/MongoPasswordResetTest.php
       - name: Validate occurrences list, detail and communication retry

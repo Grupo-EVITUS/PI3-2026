@@ -6,6 +6,16 @@ function e(mixed $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+/** Telefone guardado só com dígitos (10 ou 11) para exibição: (11) 91234-5678. */
+function formatPhone(?string $digits): string
+{
+    if ($digits === null || preg_match('/^[0-9]{10,11}$/', $digits) !== 1) {
+        return (string)$digits;
+    }
+    $split = strlen($digits) - 4;
+    return '(' . substr($digits, 0, 2) . ') ' . substr($digits, 2, $split - 2) . '-' . substr($digits, $split);
+}
+
 function staffHomePath(): string
 {
     return match ($_SESSION['profile'] ?? '') {

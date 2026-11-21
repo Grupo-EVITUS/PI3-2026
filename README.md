@@ -68,6 +68,15 @@ Acesse <http://127.0.0.1:8000>. Em produção, execute os workers como serviços
 
 A chamada informa a situação de **todos** os alunos ativos da turma na data. O serviço grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila; rejeita chamada repetida para a mesma turma e data. O envio acontece depois, pelos workers, e não na requisição.
 
+### Cadastros
+
+A Coordenação cadastra e edita turmas, alunos, responsáveis e vínculos em `/cadastros`. Dois campos são **opcionais** para aceitar listas escolares incompletas:
+
+- **Data de nascimento do aluno:** `AAAA-MM-DD`, de calendário válido, entre 1900 e hoje.
+- **Telefone do responsável:** DDD + número (celular começa em 9), com ou sem máscara e com `+55` opcional. É guardado só com dígitos e exibido como `(11) 91234-5678`.
+
+Valores inválidos são recusados sem criar nem alterar o cadastro, e deixar o campo em branco o remove. O telefone é apenas um dado de contato: o aviso de ausência continua por notificação push ou e-mail.
+
 ### Ocorrências
 
 `/ocorrencias` lista as ausências (as 200 mais recentes) com a turma da chamada, o número de comunicações, falhas e a justificativa, com filtros combináveis por **status, turma, aluno e período** (datas inicial e final, inclusive). A turma é a da chamada, então uma transferência não altera ocorrências antigas; turmas e alunos arquivados continuam disponíveis na consulta. `/ausencias/{id}` mostra o detalhe: comunicações por responsável (canal e situação), quem registrou e a justificativa.

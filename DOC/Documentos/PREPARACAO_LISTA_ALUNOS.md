@@ -10,8 +10,8 @@ externa ainda não foi implementada.
 | Cadastro | Campos necessários | Conferência |
 | --- | --- | --- |
 | Turma | Nome, série, ano letivo e turno | A turma precisa existir e estar ativa antes de vincular alunos. |
-| Aluno | Nome, turma e matrícula, se houver | Matrícula informada deve ser única. Alunos de mesmo nome exigem identificação adicional para evitar troca de cadastro. |
-| Responsável | Nome, e-mail, vínculo e aluno(s) associados | O e-mail precisa ser válido e o vínculo confirmado antes do envio de comunicados. Um aluno pode ter mais de um responsável. |
+| Aluno | Nome, turma e matrícula, se houver; data de nascimento (opcional) | Matrícula informada deve ser única. Alunos de mesmo nome exigem identificação adicional para evitar troca de cadastro. |
+| Responsável | Nome, e-mail, vínculo e aluno(s) associados; telefone (opcional) | O e-mail precisa ser válido e o vínculo confirmado antes do envio de comunicados. Um aluno pode ter mais de um responsável. |
 
 Se a lista recebida trouxer apenas os nomes dos alunos, será possível revisar
 turmas e cadastros, mas **não habilitar o fluxo de e-mail** até confirmar os

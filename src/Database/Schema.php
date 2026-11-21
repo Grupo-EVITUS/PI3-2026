@@ -43,11 +43,13 @@ final class Schema
             Collections::STUDENTS => $schema(
                 ['name', 'class_id', 'active', 'created_at'],
                 ['name' => $text, 'class_id' => $id, 'registration_no' => ['bsonType' => ['string', 'null']],
+                 'birth_date' => ['bsonType' => ['string', 'null'], 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
                  'active' => $active, 'created_at' => $date, 'link_revision' => ['bsonType' => ['int', 'long']]]
             ),
             Collections::GUARDIANS => $schema(
                 ['name', 'email', 'relationship', 'active', 'created_at'],
-                ['name' => $text, 'email' => $text, 'relationship' => $text, 'active' => $active, 'created_at' => $date]
+                ['name' => $text, 'email' => $text, 'relationship' => $text, 'active' => $active, 'created_at' => $date,
+                 'phone' => ['bsonType' => ['string', 'null'], 'pattern' => '^[0-9]{10,11}$']]
             ),
             Collections::STUDENT_GUARDIANS => $schema(
                 ['student_id', 'guardian_id'], ['student_id' => $id, 'guardian_id' => $id]

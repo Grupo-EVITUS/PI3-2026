@@ -59,14 +59,20 @@ Acesse <http://127.0.0.1:8000>. Em produção, execute os workers como serviços
 
 ## Perfis e funcionalidades
 
-- **AOE:** faz a chamada da turma (`/chamada`).
-- **Coordenação:** chamada; cadastros de turmas, alunos, responsáveis e vínculos; criação de usuários internos; convites de notificação; frequência.
-- **Diretor:** somente leitura, na tela de frequência (`/frequencia`).
+- **AOE:** faz a chamada da turma (`/chamada`), consulta ocorrências e reenvia comunicações com falha.
+- **Coordenação:** mesmos recursos da AOE; cadastros de turmas, alunos, responsáveis e vínculos; criação de usuários internos; convites de notificação; frequência.
+- **Diretor:** somente leitura: frequência (`/frequencia`) e ocorrências (`/ocorrencias`).
 - **Responsável:** sem conta. Responde por link individual de alta entropia (`/justificar/{token}`), recebido por e-mail ou como notificação push no Android.
 
 ### Chamada
 
 A chamada informa a situação de **todos** os alunos ativos da turma na data. O serviço grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila; rejeita chamada repetida para a mesma turma e data. O envio acontece depois, pelos workers, e não na requisição.
+
+### Ocorrências
+
+`/ocorrencias` lista as ausências (as 200 mais recentes) com a turma da chamada, o número de comunicações, falhas e a justificativa, com filtro por status (todas, pendentes, respondidas). `/ausencias/{id}` mostra o detalhe: comunicações por responsável (canal e situação), quem registrou e a justificativa.
+
+Quando uma comunicação falha (`FALHA`), AOE e Coordenação podem **reenviar** pelo detalhe. O reenvio cria uma nova comunicação por e-mail, com **novo link**, na fila; a anterior fica marcada como reenviada e não pode ser reenviada de novo. Não se reenvia ocorrência já respondida nem para responsável arquivado. O reenvio é auditado (`EMAIL_REENVIO_SOLICITADO`).
 
 ### Justificativa
 
@@ -148,6 +154,6 @@ A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.g
 
 ## Fora do escopo atual
 
-Listagem e detalhe de ocorrências, reenvio de comunicação pela interface, recuperação de senha, filtros por período e aluno nas ocorrências, WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
+Recuperação de senha, filtros por aluno, turma e período nas ocorrências, WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
 
 > O arquivo `saa_flask_mongodb_dashboard_atualizado.zip` e os diagramas são materiais anteriores do repositório.

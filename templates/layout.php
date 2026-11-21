@@ -24,6 +24,7 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
     </a>
     <?php if (!empty($_SESSION['user_id'])): ?>
         <nav class="main-nav" aria-label="Navegação principal">
+            <a href="/ocorrencias">Ocorrências</a>
             <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
                 <a href="/chamada">Chamada</a>
             <?php endif; ?>

@@ -34,14 +34,7 @@ final class MongoAttendance
         if (!Bson::isDay($attendanceDate)) {
             throw new InvalidArgumentException('Informe uma data válida.');
         }
-        $parts = parse_url($baseUrl);
-        if (!is_array($parts) || !in_array($parts['scheme'] ?? null, ['http', 'https'], true)
-            || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])
-            || isset($parts['query']) || isset($parts['fragment']) || strlen($baseUrl) > 300
-            || preg_match('/[\x00-\x1f\x7f]/', $baseUrl) === 1) {
-            throw new InvalidArgumentException('Endereço público do sistema inválido.');
-        }
-        $baseUrl = rtrim($baseUrl, '/');
+        $baseUrl = PublicUrl::normalize($baseUrl);
         if ($studentStatuses === [] || count($studentStatuses) > 1000) {
             throw new InvalidArgumentException('Informe a chamada completa de até 1000 alunos.');
         }
@@ -174,16 +167,10 @@ final class MongoAttendance
                         ], $options);
                         $day = (new DateTimeImmutable($attendanceDate))->format('d/m/Y');
                         $path = '/justificar/' . rawurlencode($token);
-                        $email = [
-                            'recipient' => $guardian['email'],
-                            'subject' => 'Comunicado de ausência — ' . $entry['student_name'],
-                            'body' => 'Olá, ' . $guardian['name'] . ".\n\n"
-                                . 'Informamos que ' . $entry['student_name'] . ' não compareceu à turma '
-                                . $class['name'] . ' em ' . $day
-                                . ".\n\nPara enviar a justificativa, acesse o link individual:\n"
-                                . $baseUrl . $path
-                                . "\n\nAtenciosamente,\nEquipe escolar",
-                        ];
+                        $email = AbsenceNotice::email(
+                            $guardian['email'], $guardian['name'], $entry['student_name'], $class['name'],
+                            $attendanceDate, $baseUrl . $path
+                        );
                         if ($usePush) {
                             // O e-mail fica guardado e só entra na fila se o push não for entregue.
                             $this->database->push_queue->insertOne([

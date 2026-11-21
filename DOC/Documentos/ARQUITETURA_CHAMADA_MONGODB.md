@@ -21,10 +21,9 @@ a aceitação pelo servidor e a confirmação no banco.
 
 ## Escopo pendente
 
-Ainda não há, no runtime Mongo, listagem de ocorrências, detalhe da ausência e
-reenvio de comunicação com falha pela interface; esses fluxos existiam apenas na
-implementação SQLite, removida do repositório. Relatórios por ano e intervalo
-personalizado e o calendário letivo configurável também continuam pendentes.
+Ainda não há filtros por aluno, turma e período na listagem de ocorrências
+(issue #49), recuperação de senha, relatórios por ano e intervalo personalizado
+nem calendário letivo configurável.
 
 ## Modelo canônico da chamada
 

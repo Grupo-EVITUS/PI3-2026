@@ -104,6 +104,8 @@ jobs:
           php -r 'require "vendor/autoload.php"; $db=Saa\Database\Mongo::database(); $u=$db->users->findOne(["email"=>"aoe@example.org"]); $a=$db->users->findOne(["email"=>"coord@example.org"]); exit($u && $a && $db->operation_logs->countDocuments(["action"=>"USUARIO_CRIADO","user_id"=>$a["_id"],"entity_id"=>(string)$u["_id"]])===1 && !$db->users->findOne(["email"=>"denied@example.org"]) ? 0 : 1);'
       - name: Validate MongoDB school directory
         run: php tests/Integration/Database/MongoSchoolDirectoryTest.php
+      - name: Validate occurrences list, detail and communication retry
+        run: php tests/Integration/Database/MongoOccurrencesTest.php
       - name: Validate transactional attendance and mail outbox
         run: php tests/Integration/Database/MongoAttendanceTest.php
       - name: Validate MongoDB mail lease and retry

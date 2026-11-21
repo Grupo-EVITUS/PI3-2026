@@ -2,7 +2,8 @@
 
 **Repositório de referência:** [Grupo-EVITUS/PI3-2026](https://github.com/Grupo-EVITUS/PI3-2026)  
 **Versão de referência:** branch `main`, commit `a0e7781` (28/10/2026).  
-**Arquitetura documentada:** PHP 8.1+, SQLite, PDO, HTML/CSS, worker SMTP/log.
+**Arquitetura documentada:** PHP 8.1+, SQLite, PDO, HTML/CSS, worker SMTP/log.  
+**Atenção:** o SQLite foi removido do projeto e o armazenamento é MongoDB. Estes diagramas (em especial o DER e o de classes) refletem o desenho relacional original e precisam ser refeitos para o modelo de coleções definido em `src/Database/Schema.php`.
 
 ## O que contém
 

@@ -10,7 +10,7 @@ use MongoDB\Collection;
 use MongoDB\Driver\Session;
 use RuntimeException;
 
-/** Gravador append-only para logs Mongo; não substitui a auditoria PDO do runtime atual. */
+/** Gravador append-only da auditoria (collection operation_logs). */
 final class MongoOperationLogWriter
 {
     private const MAX_ACTION_BYTES = 100;

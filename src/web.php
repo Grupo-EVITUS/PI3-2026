@@ -199,14 +199,14 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
         }
     }
     render('justification.php', [
-        'absence' => $absence, 'error' => $error, 'reasons' => Services::REASONS,
+        'absence' => $absence, 'error' => $error, 'reasons' => MongoJustification::REASONS,
         'pushPanel' => pushPanel('/justificar/' . $token . '/notificacoes'),
         'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
         'explanation' => is_string($explanation) ? $explanation : '',
     ]);
     return;
 }
-if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
+if ($path === '/chamada') {
     Auth::requireRole(['AOE', 'COORDENACAO']);
     if ($method === 'GET') {
         renderMongoAttendance();

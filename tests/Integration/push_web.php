@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Percurso HTTP completo do push, no servidor de teste (SAA_WEB_MODE=mongo_staff + chamada em homologação):
+ * Percurso HTTP completo do push, no servidor de teste:
  * convite da coordenação → ativação no "celular" → chamada → worker → serviço de push → aparelho decifra →
  * toque abre a justificativa → resposta registrada. Requer push_service_stub.php em PUSH_STUB_URL.
  */

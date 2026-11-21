@@ -32,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: mongodb-2.5.0, mbstring, pdo_sqlite
+          extensions: mongodb-2.5.0, mbstring
           tools: composer:v2
           coverage: none
       - name: Start MongoDB 7 replica set
@@ -57,58 +57,9 @@ jobs:
         run: composer test:bson
       - name: Check real MongoDB connection and round trip
         run: php tests/Integration/Database/MongoSmokeTest.php
-      - name: Lint MongoDB schema and bootstrap
+      - name: Lint PHP sources, templates, scripts and tests
         run: |
-          php -l src/Database/Schema.php
-          php -l src/Database/MongoFrequencyReport.php
-          php -l templates/frequency_dashboard.php
-          php -l tests/Integration/Database/MongoFrequencyReportTest.php
-          php -l src/Database/DemoSchoolSeed.php
-          php -l bin/seed_demo_mongodb.php
-          php -l tests/Integration/Database/MongoDemoSchoolSeedTest.php
-          php -l src/Migration/SQLiteImporter.php
-          php -l src/Migration/SQLiteSnapshot.php
-          php -l bin/import_sqlite_mongodb.php
-          php -l tests/Integration/Database/SQLiteImporterTest.php
-          php -l src/Database/InitialAdmin.php
-          php -l src/Database/HealthCheck.php
-          php -l src/Database/MongoUserAuthenticator.php
-          php -l src/Database/MongoOperationLogWriter.php
-          php -l src/Database/MongoSchoolDirectory.php
-          php -l src/Database/MongoAttendance.php
-          php -l src/Database/MongoJustification.php
-          php -l src/Database/MongoMailQueue.php
-          php -l bin/process_mail_queue_mongodb.php
-          php -l src/mongo_staff_web.php
-          php -l src/Helpers.php
-          php -l templates/staff_registration.php
-          php -l templates/school_directory.php
-          php -l templates/mongo_attendance.php
-          php -l templates/mongo_attendance_result.php
-          php -l tests/Integration/Database/MongoSchoolDirectoryTest.php
-          php -l tests/Integration/Database/MongoAttendanceTest.php
-          php -l tests/Integration/Database/MongoMailQueueTest.php
-          php -l tests/Integration/Database/MongoJustificationTest.php
-          php -l tests/Integration/Database/MongoTransactionTest.php
-          php -l bin/init_mongodb.php
-          php -l bin/create_initial_admin_mongodb.php
-          php -l bin/healthcheck_mongodb.php
-          php -l tests/Integration/Database/MongoSchemaTest.php
-          php -l tests/Integration/Database/MongoAdminHealthTest.php
-          php -l tests/Integration/Database/MongoUserAuthenticatorTest.php
-          php -l tests/Integration/Database/MongoOperationLogWriterTest.php
-          php -l src/Push/WebPush.php
-          php -l src/Database/MongoPushSubscriptions.php
-          php -l src/Database/MongoPushQueue.php
-          php -l bin/process_push_queue_mongodb.php
-          php -l bin/generate_vapid_keys.php
-          php -l templates/push_panel.php
-          php -l templates/push_activate.php
-          php -l templates/push_home.php
-          php -l templates/push_invite.php
-          php -l tests/Integration/Database/MongoPushTest.php
-          php -l tests/Integration/push_web.php
-          php -l tests/Integration/push_service_stub.php
+          find src public templates bin tests router.php -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
       - name: Validate Web Push encryption (RFC 8291), VAPID and endpoint allowlist
         run: php tests/Unit/Push/WebPushTest.php
       - name: Validate Web Push HTTP delivery to a local push service
@@ -119,8 +70,6 @@ jobs:
         run: php tests/Integration/Database/MongoFrequencyReportTest.php
       - name: Validate isolated demonstration data
         run: php tests/Integration/Database/MongoDemoSchoolSeedTest.php
-      - name: Validate isolated SQLite historical import and quarantine
-        run: php tests/Integration/Database/SQLiteImporterTest.php
       - name: Validate initial administrator and readiness check
         run: php tests/Integration/Database/MongoAdminHealthTest.php
       - name: Validate isolated MongoDB authentication
@@ -131,8 +80,6 @@ jobs:
         run: php tests/Integration/Database/MongoTransactionTest.php
       - name: Validate login and staff registration over HTTP
         env:
-          SAA_WEB_MODE: mongo_staff
-          SAA_MONGO_ATTENDANCE_PREVIEW: "true"
           MAIL_MODE: smtp
           SMTP_HOST: 127.0.0.1
           SMTP_PORT: "1025"
@@ -167,8 +114,6 @@ jobs:
         run: php tests/Integration/Database/MongoPushTest.php
       - name: Validate push notification flow over HTTP
         env:
-          SAA_WEB_MODE: mongo_staff
-          SAA_MONGO_ATTENDANCE_PREVIEW: "true"
           PUBLIC_BASE_URL: http://127.0.0.1:8767
           MONGODB_DB: saa_push_web_ci
           INITIAL_ADMIN_NAME: Coordenação

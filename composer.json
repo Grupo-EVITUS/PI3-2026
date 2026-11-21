@@ -1,6 +1,6 @@
 {
     "name": "grupo-evitus/saa",
-    "description": "SAA MongoDB foundation for staged migration",
+    "description": "Sistema de Controle de Ausências e Justificativas (PHP + MongoDB)",
     "type": "project",
     "require": {
         "php": ">=8.1",

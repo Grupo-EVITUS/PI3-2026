@@ -66,7 +66,7 @@ Acesse <http://127.0.0.1:8000>. Em produção, execute os workers como serviços
 
 ### Chamada
 
-A chamada informa a situação de **todos** os alunos ativos da turma na data. O serviço grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila; rejeita chamada repetida para a mesma turma e data. O envio acontece depois, pelos workers, e não na requisição.
+Na tela, **todos os alunos começam como presentes** e a AOE marca apenas os **ausentes**, o que poupa trabalho em turmas grandes. O envio continua levando a situação de **todos** os alunos ativos da turma na data. O serviço grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila; rejeita chamada repetida para a mesma turma e data. O envio acontece depois, pelos workers, e não na requisição. Como a presença é o padrão, quem não for marcado como ausente **não gera aviso** ao responsável, e a chamada não pode ser refeita para a mesma turma e data: confira as marcações antes de concluir.
 
 ### Cadastros
 
@@ -104,7 +104,7 @@ Na tela de acesso, **Esqueci minha senha** (`/recuperar-senha`) pede o e-mail ca
 
 ### E-mail
 
-O worker reivindica cada mensagem, tenta de novo falhas transitórias até três vezes com intervalo e ignora itens em `QUARENTENA`. A entrega é **ao menos uma vez**: uma queda entre a aceitação do SMTP e a confirmação no banco pode gerar reenvio.
+O worker reivindica cada mensagem, tenta de novo falhas transitórias até três vezes com intervalo e ignora itens em `QUARENTENA`. Quando um envio falha, o motivo (por exemplo, SMTP recusando a conexão ou a autenticação) aparece no terminal do worker, sem o destinatário nem o conteúdo da mensagem. A entrega é **ao menos uma vez**: uma queda entre a aceitação do SMTP e a confirmação no banco pode gerar reenvio.
 
 ### Frequência
 

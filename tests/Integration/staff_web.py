@@ -206,3 +206,38 @@ assert request(aoe, "/funcionarios")[0] == 403
 assert request(director, "/funcionarios")[0] == 403
 assert request(browser(), "/funcionarios")[0] == 200  # Redirect para login.
 assert request(coord, "/funcionarios", {"csrf_token": csrf(staff_page)})[0] == 405
+
+# Chamada: todos começam presentes e só os ausentes são marcados (campo oculto + caixa com o mesmo nome).
+status, directory = request(coord, "/cadastros")
+status, result = request(coord, "/cadastros/turma", dict(
+    name="Turma Padrão", grade="7º ano", academic_year="2026", shift="Manhã", csrf_token=csrf(directory)))
+assert status == 200
+default_class = re.search(r'<option value="([a-f0-9]{24})">Turma Padrão</option>', result)[1]
+for name, registration in [("Padrão A", "PD-001"), ("Padrão B", "PD-002")]:
+    status, result = request(coord, "/cadastros/aluno", dict(
+        name=name, registration_no=registration, class_id=default_class, csrf_token=csrf(result)))
+    assert status == 200 and name in result
+status, page = request(aoe, "/chamada?turma_id=" + default_class)
+assert status == 200 and "Marque somente quem faltou" in page and 'type="radio"' not in page
+assert page.count('type="checkbox" name="attendance[') == 2 and " checked" not in page
+default_ids = re.findall(r'type="hidden" name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', page)
+assert len(default_ids) == 2
+
+
+def attendance_form(date, absent=(), include=None):
+    fields = [("class_id", default_class), ("absence_date", date), ("csrf_token", csrf(page))]
+    for student in (default_ids if include is None else include):
+        fields.append(("attendance[%s]" % student, "PRESENTE"))
+        if student in absent:
+            fields.append(("attendance[%s]" % student, "AUSENTE"))
+    return fields
+
+
+status, result = request(aoe, "/chamada", attendance_form("2026-11-16"))  # ninguém marcado: todos presentes
+assert status == 200 and "2 presente(s) e" in result and "0 ausente(s)" in result and "0 comunicação(ões) aguardam" in result
+status, result = request(aoe, "/chamada", attendance_form("2026-11-17", absent=[default_ids[0]]))
+assert status == 200 and "1 presente(s) e" in result and "1 ausente(s)" in result
+assert "Sem responsável ativo para: Padrão A." in result
+status, result = request(aoe, "/chamada", attendance_form("2026-11-18", include=[default_ids[0]], absent=[default_ids[0]]))
+assert status == 422 and "todos os alunos ativos" in result  # a chamada continua exigindo a turma inteira
+assert re.search(r'value="AUSENTE"\s+checked', result)  # a marcação é mantida após o erro

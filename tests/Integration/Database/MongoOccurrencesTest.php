@@ -40,8 +40,8 @@ try {
     $directory->createGuardian($actor, 'Mãe da Alice', 'mae@example.org', 'Mãe', [$alice]);
     $directory->createGuardian($actor, 'Pai do Bruno', 'pai@example.org', 'Pai', [$bruno]);
     $directory->createGuardian($actor, 'Mãe do Bruno', 'maeb@example.org', 'Mãe', [$bruno]);
-    (new MongoAttendance($db))->record($actor, $class, [(string)$alice => 'AUSENTE', (string)$bruno => 'AUSENTE'],
-        '2026-11-15', 'https://escola.example.org');
+    (new MongoAttendance($db))->record($actor, $class, [(string)$alice, (string)$bruno],
+        '2026-11-15', 'https://escola.example.org', [(string)$alice, (string)$bruno]);
 
     $service = new MongoOccurrences($db);
     $rows = $service->list();
@@ -159,9 +159,9 @@ try {
     $carla = $directory->createStudent($actor, 'Carla', null, $classB);
     $directory->createGuardian($actor, 'Mãe da Carla', 'maec@example.org', 'Mãe', [$carla]);
     $attendance = new MongoAttendance($db);
-    $attendance->record($actor, $classB, [(string)$carla => 'AUSENTE'], '2026-11-20', 'https://escola.example.org');
-    $attendance->record($actor, $class, [(string)$alice => 'AUSENTE', (string)$bruno => 'PRESENTE'],
-        '2026-11-18', 'https://escola.example.org');
+    $attendance->record($actor, $classB, [(string)$carla], '2026-11-20', 'https://escola.example.org', [(string)$carla]);
+    $attendance->record($actor, $class, [(string)$alice],
+        '2026-11-18', 'https://escola.example.org', [(string)$alice, (string)$bruno]);
     $summary = static fn(array $rows): array => array_map(
         static fn(array $r): string => $r['student_name'] . ':' . $r['absence_date'], $rows
     );

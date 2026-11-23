@@ -25,33 +25,46 @@ final class MongoAttendance
     }
 
     /**
-     * @param array<string, string> $studentStatuses IDs hexadecimais de alunos => PRESENTE|AUSENTE
+     * @param list<string> $absentStudentIds IDs dos alunos marcados como ausentes
+     * @param list<string> $rosterStudentIds IDs dos alunos apresentados na chamada
      * @return array{attendance_session_id: string, attendance_counts: array{present: int, absent: int, total: int}, without_guardians: list<string>, notifications: int, push_notifications: int}
      */
     public function record(
-        ObjectId $actor, ObjectId $classId, array $studentStatuses, string $attendanceDate, string $baseUrl
+        ObjectId $actor, ObjectId $classId, array $absentStudentIds, string $attendanceDate, string $baseUrl,
+        array $rosterStudentIds
     ): array {
         if (!Bson::isDay($attendanceDate)) {
             throw new InvalidArgumentException('Informe uma data válida.');
         }
         $baseUrl = PublicUrl::normalize($baseUrl);
-        if ($studentStatuses === [] || count($studentStatuses) > 1000) {
-            throw new InvalidArgumentException('Informe a chamada completa de até 1000 alunos.');
+        if (count($absentStudentIds) > 1000 || !array_is_list($absentStudentIds)) {
+            throw new InvalidArgumentException('Lista de ausências inválida.');
         }
-        $statuses = [];
-        foreach ($studentStatuses as $rawId => $status) {
+        $absent = [];
+        foreach ($absentStudentIds as $rawId) {
             $id = Bson::id($rawId);
-            if ($id === null || isset($statuses[$id]) || !in_array($status, ['PRESENTE', 'AUSENTE'], true)) {
-                throw new InvalidArgumentException('A chamada contém aluno ou situação inválida.');
+            if ($id === null || isset($absent[$id])) {
+                throw new InvalidArgumentException('A chamada contém ausência duplicada ou inválida.');
             }
-            $statuses[$id] = $status;
+            $absent[$id] = true;
+        }
+        if ($rosterStudentIds === [] || count($rosterStudentIds) > 1000 || !array_is_list($rosterStudentIds)) {
+            throw new InvalidArgumentException('Recarregue a lista de alunos da turma.');
+        }
+        $roster = [];
+        foreach ($rosterStudentIds as $rawId) {
+            $id = Bson::id($rawId);
+            if ($id === null || isset($roster[$id])) {
+                throw new InvalidArgumentException('Lista de alunos duplicada ou inválida. Recarregue a turma.');
+            }
+            $roster[$id] = true;
         }
 
         $session = $this->database->getManager()->startSession();
         try {
             $result = null;
             with_transaction($session, function (Session $session) use (
-                $actor, $classId, $statuses, $attendanceDate, $baseUrl, &$result
+                $actor, $classId, $absent, $roster, $attendanceDate, $baseUrl, &$result
             ): void {
                 $options = ['session' => $session];
                 if ($this->database->users->countDocuments(
@@ -75,15 +88,15 @@ final class MongoAttendance
                     ['class_id' => $classId, 'active' => true],
                     ['sort' => ['_id' => 1], 'session' => $session]
                 )->toArray();
-                if ($students === [] || count($students) > 1000 || count($students) !== count($statuses)) {
-                    throw new InvalidArgumentException('Informe a situação de todos os alunos ativos da turma selecionada.');
+                if ($students === [] || count($students) > 1000 || count($students) !== count($roster)) {
+                    throw new InvalidArgumentException('A turma mudou durante a chamada. Recarregue a lista.');
                 }
                 $entries = [];
                 foreach ($students as $student) {
                     $studentId = $student['_id'];
                     $key = (string)$studentId;
-                    if (!isset($statuses[$key])) {
-                        throw new InvalidArgumentException('Informe a situação de todos os alunos ativos da turma selecionada.');
+                    if (!isset($roster[$key])) {
+                        throw new InvalidArgumentException('A turma mudou durante a chamada. Recarregue a lista.');
                     }
                     // Disputa com transferência/arquivamento do aluno e mudanças de vínculo.
                     if ($this->database->students->updateOne(
@@ -94,8 +107,12 @@ final class MongoAttendance
                     }
                     $entries[] = [
                         'student_id' => $studentId, 'student_name' => $student['name'],
-                        'registration_no' => $student['registration_no'] ?? null, 'status' => $statuses[$key],
+                        'registration_no' => $student['registration_no'] ?? null,
+                        'status' => isset($absent[$key]) ? 'AUSENTE' : 'PRESENTE',
                     ];
+                }
+                if (array_diff_key($absent, $roster) !== []) {
+                    throw new InvalidArgumentException('A chamada contém aluno ausente fora da turma.');
                 }
                 $sessionId = new ObjectId();
                 $now = new UTCDateTime();

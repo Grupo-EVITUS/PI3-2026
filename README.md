@@ -47,6 +47,26 @@ php bin/healthcheck_mongodb.php     # confere coleções, validators e índices
 
 `init_mongodb.php` não cria usuários, senhas padrão nem dados escolares. O comando da conta inicial roda uma única vez e recusa novas execuções quando já existe usuário.
 
+### Testar o envio de e-mail localmente
+
+O Docker Compose do projeto sobe MongoDB e Mailpit para desenvolvimento. O Mailpit recebe os e-mails de teste em `127.0.0.1:1025` e os mostra em <http://127.0.0.1:8025>; não entrega mensagens aos responsáveis. Suba os serviços e configure as variáveis **em cada terminal PowerShell** usado para executar o PHP; copiar `.env.example` para `.env` não carrega as variáveis automaticamente:
+
+```powershell
+docker compose -f docker-compose.saa-mongodb.yml up -d --wait
+$env:MONGODB_URI = "mongodb://127.0.0.1:27017/?replicaSet=rs0"
+$env:MONGODB_DB = "saa"
+$env:PUBLIC_BASE_URL = "http://127.0.0.1:8000"
+$env:MAIL_MODE = "smtp"
+$env:SMTP_HOST = "127.0.0.1"
+$env:SMTP_PORT = "1025"
+$env:SMTP_ENCRYPTION = "none"
+$env:MAIL_FROM = "nao-responda@escola.example.org"
+```
+
+Com `composer install` e `php bin/init_mongodb.php` já executados, inicie `php -S 127.0.0.1:8000 router.php` num terminal e `php bin/process_mail_queue_mongodb.php --watch` em outro, com as variáveis acima nos dois. Cadastre e vincule um responsável a um aluno com endereço de teste; conclua uma chamada com esse aluno ausente. O resumo da chamada informa quantos avisos **entraram na fila**, ainda não quantos foram entregues. Confira a mensagem em <http://127.0.0.1:8025> e a situação da comunicação em `/ocorrencias` ou `/ausencias/{id}`. Se não houver mensagem, confira se a chamada gerou ausência, se há responsável ativo vinculado, se o worker está em execução e se `mail_queue` está `AGUARDANDO`, `CONCLUIDO` ou `FALHA`. Caso haja inscrição push ativa, o aviso entra primeiro em `push_queue` e exige o worker de push; e-mail só entra na fila se o push não for entregue.
+
+Não use `MAIL_MODE=log` para esse teste: o worker de e-mail exige `smtp`. Para entrega real, configure SMTP autorizado pela escola, TLS e credenciais no ambiente de execução, sem versionar segredos.
+
 Suba a aplicação e os workers em terminais separados, com as mesmas variáveis:
 
 ```powershell
@@ -66,7 +86,7 @@ Acesse <http://127.0.0.1:8000>. Em produção, execute os workers como serviços
 
 ### Chamada
 
-A chamada informa a situação de **todos** os alunos ativos da turma na data. O serviço grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila; rejeita chamada repetida para a mesma turma e data. O envio acontece depois, pelos workers, e não na requisição.
+A equipe escolhe a turma e a data e marca **apenas os alunos ausentes**. Antes de concluir, os demais permanecem sem registro. Ao concluir, o serviço confere a lista de alunos apresentada contra os alunos ativos da turma, registra os não marcados como presentes e grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila. Mesmo sem faltas, a chamada deve ser concluída explicitamente. O serviço rejeita chamadas repetidas para a mesma turma e data; o envio acontece depois, pelos workers, e não na requisição.
 
 ### Cadastros
 

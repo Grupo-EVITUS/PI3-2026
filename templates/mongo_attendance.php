@@ -1,9 +1,10 @@
 <?php $pageTitle = 'Chamada MongoDB - homologação'; ?>
+<script src="/assets/attendance.js" defer></script>
 <section class="page-heading">
     <div>
         <span class="eyebrow">Homologação MongoDB</span>
         <h1>Registrar chamada</h1>
-        <p>Marque todos os alunos ativos como presentes ou ausentes.</p>
+        <p>Marque somente os alunos ausentes. Ao concluir, os demais serão registrados como presentes.</p>
     </div>
 </section>
 <div class="notice notice-warning" role="status">
@@ -33,12 +34,13 @@
         <?php if ($error): ?><div class="notice notice-error" role="alert"><?= e($error) ?></div><?php endif; ?>
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <input type="hidden" name="class_id" value="<?= e((string)$classId) ?>">
+        <input type="hidden" name="attendance_submitted" value="1">
         <div class="field date-field">
             <label for="absence_date">Data da chamada</label>
             <input id="absence_date" name="absence_date" type="date" required value="<?= e($absenceDate) ?>">
         </div>
         <fieldset class="student-picker">
-            <legend>Chamada da turma <span class="legend-note">Informe a situação de cada aluno</span></legend>
+            <legend>Chamada da turma <span class="legend-note">Marque apenas as ausências</span></legend>
             <?php if ($students === []): ?>
                 <p class="muted">Não há alunos ativos nesta turma.</p>
             <?php elseif (count($students) > 1000): ?>
@@ -47,18 +49,20 @@
                 <div class="student-grid">
                     <?php foreach ($students as $student): ?>
                         <?php $studentKey = (string)$student['_id']; ?>
-                        <fieldset class="student-option attendance-option">
-                            <legend><strong><?= e($student['name']) ?></strong><small><?= e($student['registration_no'] ?? 'Sem matrícula informada') ?></small></legend>
-                            <label><input type="radio" name="attendance[<?= e($studentKey) ?>]" value="PRESENTE" required
-                                <?= ($selectedAttendance[$studentKey] ?? null) === 'PRESENTE' ? 'checked' : '' ?>> Presente</label>
-                            <label><input type="radio" name="attendance[<?= e($studentKey) ?>]" value="AUSENTE" required
-                                <?= ($selectedAttendance[$studentKey] ?? null) === 'AUSENTE' ? 'checked' : '' ?>> Ausente</label>
-                        </fieldset>
+                        <input type="hidden" name="roster_student_ids[]" value="<?= e($studentKey) ?>">
+                        <label class="student-option attendance-option">
+                            <span><strong><?= e($student['name']) ?></strong><small><?= e($student['registration_no'] ?? 'Sem matrícula informada') ?></small></span>
+                            <span class="attendance-absence"><input type="checkbox" name="absent_student_ids[]" value="<?= e($studentKey) ?>"
+                                <?= ($selectedAttendance[$studentKey] ?? null) === 'AUSENTE' ? 'checked' : '' ?>> Ausente</span>
+                        </label>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </fieldset>
         <?php if ($students !== [] && count($students) <= 1000): ?>
+            <p class="notice attendance-summary" aria-live="polite" data-attendance-summary data-total="<?= count($students) ?>">
+                Confira os <?= count($students) ?> alunos da turma antes de concluir. Os não marcados serão registrados como presentes.
+            </p>
             <div class="form-actions"><button class="button button-primary" type="submit">Concluir chamada de homologação</button></div>
         <?php endif; ?>
     </form>

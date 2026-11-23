@@ -127,7 +127,8 @@ webCheck(str_contains($page, 'Push em 1 aparelho(s)'), 'cadastros não mostram o
 // Chamada com a aluna ausente → fila de push, sem e-mail.
 [, $page] = browse($coord, $base . '/chamada?turma_id=' . $class[1]);
 [$status, $page] = browse($coord, $base . '/chamada', ['csrf_token' => csrfFrom($page), 'class_id' => $class[1],
-    'absence_date' => '2026-11-16', 'attendance[' . $student[1] . ']' => 'AUSENTE']);
+    'absence_date' => '2026-11-16', 'attendance_submitted' => '1',
+    'roster_student_ids[]' => $student[1], 'absent_student_ids[]' => $student[1]]);
 webCheck($status === 200 && str_contains($page, '1 por notificação push'), 'chamada não roteou para push.');
 webCheck($db->push_queue->countDocuments(['guardian_id' => $guardian['_id'], 'status' => 'AGUARDANDO']) === 1
     && $db->mail_queue->countDocuments(['recipient' => 'mae.push@example.org']) === 0, 'filas inesperadas após a chamada.');

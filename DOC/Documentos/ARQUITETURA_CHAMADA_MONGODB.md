@@ -8,6 +8,12 @@
 O serviço `MongoAttendance::record` registra, em uma transação no replica set,
 o roster completo, ausências, auditoria, comunicações e e-mails na fila. Ele
 rejeita chamadas repetidas e alterações concorrentes de turma/aluno/vínculo.
+A interface recebe apenas os IDs marcados como ausentes. No instante da
+conclusão, o servidor compara a lista de alunos exibida com os alunos ativos da
+turma na transação e registra `PRESENTE` para todos os demais. Uma lista vazia
+de ausências é válida para uma turma com alunos; uma lista de turma alterada
+é recusada e precisa ser recarregada. Antes da conclusão, nenhum aluno recebe
+presença automática. A chamada concluída ainda não possui fluxo de correção.
 A gravação não envia SMTP dentro da requisição; o worker separado processa a
 fila.
 

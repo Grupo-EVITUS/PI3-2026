@@ -58,7 +58,7 @@ try {
     $subscriptions = new MongoPushSubscriptions($db);
     $attendance = new MongoAttendance($db);
     $absentOn = static fn(string $day): array => $attendance->record(
-        $coord, $class, [(string)$student => 'AUSENTE'], $day, 'https://escola.example.org'
+        $coord, $class, [(string)$student], $day, 'https://escola.example.org', [(string)$student]
     );
 
     // Convite: somente coordenação, uso único, inscrição inválida não consome o convite.

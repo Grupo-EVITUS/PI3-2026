@@ -15,7 +15,7 @@ def browser():
 
 
 def request(client, path, fields=None):
-    data = None if fields is None else urlencode(fields).encode()
+    data = None if fields is None else urlencode(fields, doseq=True).encode()
     try:
         response = client.open(BASE + path, data, timeout=10)
     except HTTPError as error:
@@ -115,14 +115,15 @@ guest_status, guest_page = request(browser(), "/chamada")
 assert guest_status == 200 and 'action="/login"' in guest_page
 status, attendance_page = request(aoe, "/chamada?turma_id=" + attendance_class)
 assert status == 200 and "O envio depende da execução do worker SMTP" in attendance_page
-student_ids = re.findall(r'name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', attendance_page)
+student_ids = re.findall(r'name="roster_student_ids\[\]" value="([a-f0-9]{24})"', attendance_page)
 assert len(student_ids) == 2 and first_id in student_ids
 partial = {"class_id": attendance_class, "absence_date": "2026-11-15",
-           "attendance[" + first_id + "]": "AUSENTE", "csrf_token": csrf(attendance_page)}
+           "attendance_submitted": "1", "roster_student_ids[]": first_id,
+           "absent_student_ids[]": first_id, "csrf_token": csrf(attendance_page)}
 assert request(aoe, "/chamada", {k: v for k, v in partial.items() if k != "csrf_token"})[0] == 400
 status, invalid = request(aoe, "/chamada", partial)
-assert status == 422 and "todos os alunos ativos" in invalid
-full = dict(partial, **{"attendance[" + next(x for x in student_ids if x != first_id) + "]": "PRESENTE"})
+assert status == 422 and "Recarregue a lista" in invalid
+full = dict(partial, **{"roster_student_ids[]": student_ids})
 status, summary = request(aoe, "/chamada", full)
 assert status == 200 and "Chamada registrada" in summary and "não envia avisos diretamente" in summary and "0 por notificação push" in summary
 assert "1 comunicação(ões) aguardam" in summary

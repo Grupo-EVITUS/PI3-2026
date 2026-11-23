@@ -43,23 +43,28 @@ try {
     $noGuardian = $directory->createStudent($actor, 'Sem responsável', null, $class);
     $directory->createGuardian($actor, 'Responsável 1', 'primeiro@example.org', 'Mãe', [$absent]);
     $directory->createGuardian($actor, 'Responsável 2', 'segundo@example.org', 'Pai', [$absent]);
-    $statuses = [(string)$present => 'PRESENTE', (string)$absent => 'AUSENTE',
-        (string)$noGuardian => 'AUSENTE'];
+    $roster = [(string)$present, (string)$absent, (string)$noGuardian];
+    $absentIds = [(string)$absent, (string)$noGuardian];
 
     failsAttendance(fn() => $attendance->record($actor, $class,
-        [(string)$present => 'PRESENTE'], '2026-11-15', 'https://escola.example.org'), InvalidArgumentException::class);
+        $absentIds, '2026-11-15', 'https://escola.example.org', [(string)$present]), InvalidArgumentException::class);
     failsAttendance(fn() => $attendance->record($actor, $class,
-        $statuses + [(string)new ObjectId() => 'PRESENTE'], '2026-11-15', 'https://escola.example.org'),
+        [...$absentIds, (string)new ObjectId()], '2026-11-15', 'https://escola.example.org', $roster),
         InvalidArgumentException::class);
     failsAttendance(fn() => $attendance->record($actor, $class,
-        $statuses, '2026-02-30', 'https://escola.example.org'), InvalidArgumentException::class);
+        [(string)$absent, (string)$absent], '2026-11-15', 'https://escola.example.org', $roster),
+        InvalidArgumentException::class);
     failsAttendance(fn() => $attendance->record($actor, $class,
-        $statuses, '2026-11-15', 'https://user@escola.example.org'), InvalidArgumentException::class);
+        ['invalido'], '2026-11-15', 'https://escola.example.org', $roster), InvalidArgumentException::class);
+    failsAttendance(fn() => $attendance->record($actor, $class,
+        $absentIds, '2026-02-30', 'https://escola.example.org', $roster), InvalidArgumentException::class);
+    failsAttendance(fn() => $attendance->record($actor, $class,
+        $absentIds, '2026-11-15', 'https://user@escola.example.org', $roster), InvalidArgumentException::class);
     failsAttendance(fn() => $attendance->record(new ObjectId(), $class,
-        $statuses, '2026-11-15', 'https://escola.example.org'), RuntimeException::class);
+        $absentIds, '2026-11-15', 'https://escola.example.org', $roster), RuntimeException::class);
     assertAttendance($db->attendance_sessions->countDocuments() === 0, 'Rejeições não podem gerar sessão.');
 
-    $result = $attendance->record($actor, $class, $statuses, '2026-11-15', 'https://escola.example.org');
+    $result = $attendance->record($actor, $class, $absentIds, '2026-11-15', 'https://escola.example.org', $roster);
     assertAttendance($result['attendance_counts'] === ['present' => 1, 'absent' => 2, 'total' => 3]
         && $result['notifications'] === 2 && $result['without_guardians'] === ['Sem responsável'],
         'Resumo da chamada divergente.');
@@ -67,6 +72,14 @@ try {
     $saved = $db->attendance_sessions->findOne(['_id' => $sessionId]);
     assertAttendance($saved['status'] === 'CONCLUIDA' && count($saved['entries']) === 3
         && $saved['class_name'] === 'Turma A', 'Roster e snapshot precisam ser persistidos.');
+    $savedByStudent = [];
+    foreach ($saved['entries'] as $entry) {
+        $savedByStudent[(string)$entry['student_id']] = $entry['status'];
+    }
+    assertAttendance(count($savedByStudent) === 3 && ($savedByStudent[(string)$present] ?? null) === 'PRESENTE'
+        && ($savedByStudent[(string)$absent] ?? null) === 'AUSENTE'
+        && ($savedByStudent[(string)$noGuardian] ?? null) === 'AUSENTE',
+        'Alunos não marcados como ausentes devem virar presentes apenas na chamada concluída.');
     assertAttendance($db->absences->countDocuments(['attendance_session_id' => $sessionId]) === 2
         && $db->absences->countDocuments(['student_id' => $present]) === 0,
         'Somente alunos ausentes geram ocorrência.');
@@ -81,8 +94,8 @@ try {
     }
     assertAttendance($db->operation_logs->countDocuments(['action' => 'CHAMADA_CONCLUIDA',
         'entity_id' => (string)$sessionId]) === 1, 'Chamada deve gerar auditoria.');
-    failsAttendance(fn() => $attendance->record($actor, $class, $statuses, '2026-11-15',
-        'https://escola.example.org'), DomainException::class);
+    failsAttendance(fn() => $attendance->record($actor, $class, $absentIds, '2026-11-15',
+        'https://escola.example.org', $roster), DomainException::class);
     assertAttendance($db->mail_queue->countDocuments() === 2, 'Chamada duplicada não pode duplicar e-mails.');
 
     $presentOnlyClass = $directory->createClass($actor, 'Turma B', '6º ano', 2026, 'Tarde');
@@ -91,8 +104,9 @@ try {
         $actor, 'Agente escolar', 'aoe@example.org', 'Senha-temporaria-2026', 'AOE'
     );
     $allPresent = $attendance->record($aoe, $presentOnlyClass,
-        [(string)$onlyPresent => 'PRESENTE'], '2026-11-15', 'https://escola.example.org');
-    assertAttendance($allPresent['notifications'] === 0 && $db->mail_queue->countDocuments() === 2,
+        [], '2026-11-15', 'https://escola.example.org', [(string)$onlyPresent]);
+    assertAttendance($allPresent['attendance_counts'] === ['present' => 1, 'absent' => 0, 'total' => 1]
+        && $allPresent['notifications'] === 0 && $db->mail_queue->countDocuments() === 2,
         'Turma sem faltas não gera e-mail.');
 
     $legacyClass = $directory->createClass($actor, 'Turma legado', '8º ano', 2026, 'Manhã');
@@ -102,7 +116,7 @@ try {
         'registered_by' => $actor, 'created_at' => new UTCDateTime(),
         'class_snapshot_source' => 'unknown']);
     failsAttendance(fn() => $attendance->record($actor, $legacyClass,
-        [(string)$legacyStudent => 'AUSENTE'], '2026-11-15', 'https://escola.example.org'),
+        [(string)$legacyStudent], '2026-11-15', 'https://escola.example.org', [(string)$legacyStudent]),
         DomainException::class);
     assertAttendance($db->attendance_sessions->countDocuments(['class_id' => $legacyClass]) === 0
         && $db->mail_queue->countDocuments() === 2,
@@ -114,7 +128,7 @@ try {
     $db->command(['collMod' => 'operation_logs', 'validator' => ['action' => 'impossible'],
         'validationLevel' => 'strict', 'validationAction' => 'error'])->toArray();
     failsAttendance(fn() => $attendance->record($actor, $rollbackClass,
-        [(string)$rollbackStudent => 'AUSENTE'], '2026-11-15', 'https://escola.example.org'),
+        [(string)$rollbackStudent], '2026-11-15', 'https://escola.example.org', [(string)$rollbackStudent]),
         BulkWriteException::class);
     assertAttendance($db->attendance_sessions->countDocuments(['class_id' => $rollbackClass]) === 0
         && $db->absences->countDocuments(['student_id' => $rollbackStudent]) === 0,

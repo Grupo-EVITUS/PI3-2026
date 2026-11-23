@@ -20,8 +20,8 @@ try {
     $student = $directory->createStudent($actor, 'Aluno', null, $class);
     $directory->createGuardian($actor, 'Mãe', 'mae@example.org', 'Mãe', [$student]);
     $directory->createGuardian($actor, 'Pai', 'pai@example.org', 'Pai', [$student]);
-    (new MongoAttendance($db))->record($actor, $class, [(string)$student => 'AUSENTE'],
-        '2026-11-15', 'https://escola.example.org');
+    (new MongoAttendance($db))->record($actor, $class, [(string)$student],
+        '2026-11-15', 'https://escola.example.org', [(string)$student]);
     $service = new MongoJustification($db);
     $tokens = [];
     foreach ($db->mail_queue->find() as $job) {

@@ -19,8 +19,8 @@ try {
     $class = $directory->createClass($actor, 'Turma', '5º', 2026, 'Manhã');
     $student = $directory->createStudent($actor, 'Aluno', null, $class);
     $directory->createGuardian($actor, 'Mãe', 'mae@example.org', 'Mãe', [$student]);
-    (new MongoAttendance($db))->record($actor, $class, [(string)$student => 'AUSENTE'],
-        '2026-11-15', 'http://127.0.0.1:8765');
+    (new MongoAttendance($db))->record($actor, $class, [(string)$student],
+        '2026-11-15', 'http://127.0.0.1:8765', [(string)$student]);
     $worker = new MongoMailQueue($db);
     $attempts = 0;
     $failed = $worker->process(static function (array $job) use (&$attempts): void {

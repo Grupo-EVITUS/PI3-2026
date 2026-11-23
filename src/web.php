@@ -393,17 +393,28 @@ if ($path === '/chamada') {
         $actor = Bson::objectId($_SESSION['user_id'] ?? null);
         $classId = Bson::objectId($_POST['class_id'] ?? null);
         $date = $_POST['absence_date'] ?? null;
-        $attendance = $_POST['attendance'] ?? null;
-        if ($actor === null || $classId === null || !is_string($date) || !is_array($attendance)) {
-            throw new InvalidArgumentException('Informe turma, data e chamada completa.');
+        $absentStudentIds = $_POST['absent_student_ids'] ?? [];
+        $rosterStudentIds = $_POST['roster_student_ids'] ?? null;
+        if ($actor === null || $classId === null || !is_string($date)
+            || ($_POST['attendance_submitted'] ?? null) !== '1'
+            || !is_array($absentStudentIds) || !is_array($rosterStudentIds)) {
+            throw new InvalidArgumentException('Informe turma, data e carregue a lista de alunos.');
         }
         $result = (new MongoAttendance(Mongo::database()))->record(
-            $actor, $classId, $attendance, $date, baseUrl()
+            $actor, $classId, $absentStudentIds, $date, baseUrl(), $rosterStudentIds
         );
         render('mongo_attendance_result.php', ['result' => $result, 'date' => $date]);
     } catch (InvalidArgumentException|DomainException $error) {
         http_response_code(422);
-        renderMongoAttendance($error->getMessage(), is_array($_POST['attendance'] ?? null) ? $_POST['attendance'] : []);
+        $selectedAttendance = [];
+        if (is_array($_POST['absent_student_ids'] ?? null)) {
+            foreach ($_POST['absent_student_ids'] as $id) {
+                if (($validId = Bson::id($id)) !== null) {
+                    $selectedAttendance[$validId] = 'AUSENTE';
+                }
+            }
+        }
+        renderMongoAttendance($error->getMessage(), $selectedAttendance);
     }
     return;
 }

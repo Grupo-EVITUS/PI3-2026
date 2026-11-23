@@ -127,6 +127,11 @@ tbody tr:last-child td { border-bottom: 0; }
 .attendance-option legend { width: 100%; min-width: 120px; flex: 1; padding: 0; }
 .attendance-option > label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: #405c61; font-size: 11px; font-weight: 650; cursor: pointer; }
 .attendance-option > label input { width: 15px; height: 15px; }
+.attendance-option > span:first-child { min-width: 0; }
+.attendance-option .attendance-absence { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #405c61; font-size: 11px; font-weight: 650; }
+.attendance-option .attendance-absence input { width: 17px; height: 17px; cursor: pointer; }
+.attendance-option:has(input:checked) { border-color: #bf7967; background: #fff5f1; }
+.attendance-summary { margin-top: 18px; }
 .form-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 .result-list { display: flex; flex-direction: column; }
 .result-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 14px 0; border-top: 1px solid #edf2f1; }

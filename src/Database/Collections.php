@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Saa\Database;
 
 /**
- * Nomes de coleções compatíveis com o contrato SQLite que será importado na etapa 4.
- * attendance_sessions guarda a chamada completa no MongoDB, separada da importação legada.
+ * Nomes das coleções do SAA no MongoDB.
+ * attendance_sessions guarda a chamada completa da turma.
  */
 final class Collections
 {
@@ -29,6 +29,9 @@ final class Collections
     public const PUSH_SUBSCRIPTIONS = 'push_subscriptions';
     public const PUSH_INVITES = 'push_invites';
     public const PUSH_QUEUE = 'push_queue';
+
+    // Redefinição de senha da equipe: token (hash) e o e-mail a entregar pelo worker.
+    public const PASSWORD_RESETS = 'password_resets';
 
     /** @return list<string> */
     public static function legacyImport(): array

@@ -10,8 +10,8 @@ externa ainda não foi implementada.
 | Cadastro | Campos necessários | Conferência |
 | --- | --- | --- |
 | Turma | Nome, série, ano letivo e turno | A turma precisa existir e estar ativa antes de vincular alunos. |
-| Aluno | Nome, turma e matrícula, se houver | Matrícula informada deve ser única. Alunos de mesmo nome exigem identificação adicional para evitar troca de cadastro. |
-| Responsável | Nome, e-mail, vínculo e aluno(s) associados | O e-mail precisa ser válido e o vínculo confirmado antes do envio de comunicados. Um aluno pode ter mais de um responsável. |
+| Aluno | Nome, turma e matrícula, se houver; data de nascimento (opcional) | Matrícula informada deve ser única. Alunos de mesmo nome exigem identificação adicional para evitar troca de cadastro. |
+| Responsável | Nome, e-mail, vínculo e aluno(s) associados; telefone (opcional) | O e-mail precisa ser válido e o vínculo confirmado antes do envio de comunicados. Um aluno pode ter mais de um responsável. |
 
 Se a lista recebida trouxer apenas os nomes dos alunos, será possível revisar
 turmas e cadastros, mas **não habilitar o fluxo de e-mail** até confirmar os
@@ -25,7 +25,5 @@ não se deve inventar presença ou ausência durante a carga.
 3. Ensaiar os cadastros em um ambiente isolado com dados fictícios e registrar divergências.
 4. Com os dados reais autorizados, validar as contagens de turmas, alunos e vínculos e somente então habilitar o envio de e-mail no ambiente operacional.
 
-O procedimento de migração do histórico SQLite para MongoDB é separado da
-entrada de uma lista nova de alunos. O importador SQLite existente não lê CSV
-ou planilhas; o formato da lista real deverá ser confirmado antes de criar uma
-importação em lote, se a equipe precisar dessa funcionalidade.
+A importação em lote de uma planilha ainda não existe; o formato da lista real
+deverá ser confirmado antes de criar essa funcionalidade, se a equipe precisar dela.

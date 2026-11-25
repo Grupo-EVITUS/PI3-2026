@@ -9,6 +9,9 @@ use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\MongoAttendance;
 use Saa\Database\MongoFrequencyReport;
 use Saa\Database\MongoJustification;
+use Saa\Database\MongoOccurrences;
+use Saa\Database\MongoPasswordReset;
+use Saa\Database\MongoStaffDirectory;
 use Saa\Database\MongoPushSubscriptions;
 use Saa\Push\WebPush;
 use Saa\Database\Bson;
@@ -41,6 +44,20 @@ function renderMongoAttendance(?string $error = null, array $selectedAttendance 
     $date = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['absence_date'] ?? null) : null;
     $absenceDate = is_string($date) && Bson::isDay($date) ? $date : date('Y-m-d');
     render('mongo_attendance.php', compact('classes', 'classId', 'students', 'error', 'selectedAttendance', 'absenceDate'));
+}
+
+/** Exige conta ativa com um dos perfis; revalida no banco, além do perfil da sessão. */
+function activeStaffId(array $profiles): ObjectId
+{
+    $actor = Bson::objectId($_SESSION['user_id'] ?? null);
+    if ($actor === null || Mongo::database()->users->countDocuments(
+        ['_id' => $actor, 'active' => true, 'profile' => ['$in' => $profiles]]
+    ) !== 1) {
+        http_response_code(403);
+        render('error.php', ['title' => 'Acesso negado', 'message' => 'Seu acesso não está ativo.']);
+        exit;
+    }
+    return $actor;
 }
 
 function renderSchoolDirectory(): void
@@ -139,6 +156,57 @@ if ($path === '/logout') {
     session_regenerate_id(true);
     Auth::redirect('/login');
 }
+if ($path === '/recuperar-senha') {
+    header('Cache-Control: no-store');
+    $sent = false;
+    $email = '';
+    if ($method === 'POST') {
+        requirePost();
+        $email = is_string($_POST['email'] ?? null) ? $_POST['email'] : '';
+        (new MongoPasswordReset(Mongo::database()))->request($email, baseUrl());
+        $sent = true;
+    }
+    render('password_forgot.php', ['sent' => $sent, 'email' => $sent ? '' : $email]);
+    return;
+}
+if (preg_match('#^/redefinir-senha/([A-Za-z0-9_-]+)$#', $path, $matches) === 1) {
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+    $token = $matches[1];
+    $service = new MongoPasswordReset(Mongo::database());
+    $account = $service->find($token);
+    if ($account === null) {
+        http_response_code(404);
+        render('error.php', ['title' => 'Link indisponível',
+            'message' => 'Este link é inválido, expirou ou já foi usado. Peça uma nova redefinição na tela de acesso.']);
+        return;
+    }
+    $error = null;
+    if ($method === 'POST') {
+        requirePost();
+        $password = $_POST['password'] ?? null;
+        try {
+            if (!is_string($password) || !is_string($_POST['password_confirmation'] ?? null)
+                || !hash_equals($password, $_POST['password_confirmation'])) {
+                throw new InvalidArgumentException('A confirmação não confere com a nova senha.');
+            }
+            $service->reset($token, $password);
+            flash('Senha redefinida. Entre com a nova senha.');
+            Auth::redirect('/login');
+        } catch (InvalidArgumentException $caught) {
+            http_response_code(422);
+            $error = $caught->getMessage();
+        } catch (DomainException) {
+            http_response_code(404);
+            render('error.php', ['title' => 'Link indisponível',
+                'message' => 'Este link é inválido, expirou ou já foi usado. Peça uma nova redefinição na tela de acesso.']);
+            return;
+        }
+    }
+    render('password_reset.php', ['name' => $account['name'], 'error' => $error,
+        'minLength' => MongoPasswordReset::MIN_PASSWORD_BYTES]);
+    return;
+}
 if ($path === '/notificacoes') {
     render('push_home.php');
     return;
@@ -199,14 +267,122 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
         }
     }
     render('justification.php', [
-        'absence' => $absence, 'error' => $error, 'reasons' => Services::REASONS,
+        'absence' => $absence, 'error' => $error, 'reasons' => MongoJustification::REASONS,
         'pushPanel' => pushPanel('/justificar/' . $token . '/notificacoes'),
         'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
         'explanation' => is_string($explanation) ? $explanation : '',
     ]);
     return;
 }
-if ($path === '/chamada' && mongoAttendancePreviewEnabled()) {
+if ($path === '/ocorrencias' || preg_match('#^/ausencias/([a-f0-9]{24})$#', $path, $absenceMatch) === 1) {
+    Auth::requireRole(['AOE', 'COORDENACAO', 'DIRETOR']);
+    if ($method !== 'GET') {
+        http_response_code(405);
+        header('Allow: GET');
+        return;
+    }
+    activeStaffId(['AOE', 'COORDENACAO', 'DIRETOR']);
+    header('Cache-Control: no-store');
+    $occurrences = new MongoOccurrences(Mongo::database());
+    if ($path === '/ocorrencias') {
+        $filters = [];
+        foreach (['status', 'turma_id', 'aluno_id', 'de', 'ate'] as $name) {
+            $value = $_GET[$name] ?? '';
+            if (!is_string($value) || strlen($value) > 40) {
+                http_response_code(422);
+                render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise status, turma, aluno e período.']);
+                return;
+            }
+            $filters[$name] = trim($value);
+        }
+        $classId = $filters['turma_id'] === '' ? null : Bson::objectId($filters['turma_id']);
+        $studentId = $filters['aluno_id'] === '' ? null : Bson::objectId($filters['aluno_id']);
+        if (!in_array($filters['status'], ['', 'PENDENTE', 'RESPONDIDA'], true)
+            || ($filters['turma_id'] !== '' && $classId === null)
+            || ($filters['aluno_id'] !== '' && $studentId === null)) {
+            http_response_code(422);
+            render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise status, turma, aluno e período.']);
+            return;
+        }
+        try {
+            $rows = $occurrences->list(
+                $filters['status'] === '' ? null : $filters['status'], $classId, $studentId,
+                $filters['de'] === '' ? null : $filters['de'], $filters['ate'] === '' ? null : $filters['ate']
+            );
+        } catch (InvalidArgumentException $error) {
+            http_response_code(422);
+            render('error.php', ['title' => 'Filtros inválidos', 'message' => $error->getMessage()]);
+            return;
+        }
+        $database = Mongo::database();
+        render('occurrences.php', [
+            'occurrences' => $rows, 'filters' => $filters, 'reasons' => MongoJustification::REASONS,
+            'limit' => MongoOccurrences::LIMIT,
+            'classes' => $database->classes->find([], ['sort' => ['name' => 1], 'limit' => 1000])->toArray(),
+            'students' => $database->students->find([], ['sort' => ['name' => 1], 'limit' => 1000])->toArray(),
+        ]);
+        return;
+    }
+    $absence = $occurrences->detail(new ObjectId($absenceMatch[1]));
+    if ($absence === null) {
+        notFound();
+    }
+    render('absence_detail.php', ['absence' => $absence, 'reasons' => MongoJustification::REASONS]);
+    return;
+}
+if ($path === '/funcionarios') {
+    Auth::requireRole(['COORDENACAO']);
+    if ($method !== 'GET') {
+        http_response_code(405);
+        header('Allow: GET');
+        return;
+    }
+    activeStaffId(['COORDENACAO']);
+    header('Cache-Control: no-store');
+    $filters = [];
+    foreach (['busca', 'perfil', 'situacao'] as $name) {
+        $value = $_GET[$name] ?? '';
+        if (!is_string($value) || strlen($value) > 200) {
+            http_response_code(422);
+            render('error.php', ['title' => 'Filtros inválidos', 'message' => 'Revise a busca, o perfil e a situação.']);
+            return;
+        }
+        $filters[$name] = trim($value);
+    }
+    try {
+        if (!in_array($filters['situacao'], ['', 'ativos', 'inativos'], true)) {
+            throw new InvalidArgumentException('Situação inválida.');
+        }
+        $staff = (new MongoStaffDirectory(Mongo::database()))->list(
+            $filters['busca'], $filters['perfil'] === '' ? null : $filters['perfil'],
+            $filters['situacao'] === '' ? null : $filters['situacao'] === 'ativos'
+        );
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        render('error.php', ['title' => 'Filtros inválidos', 'message' => $error->getMessage()]);
+        return;
+    }
+    render('staff_list.php', ['staff' => $staff, 'filters' => $filters, 'limit' => MongoStaffDirectory::LIMIT]);
+    return;
+}
+if ($path === '/comunicacoes/reenvio') {
+    Auth::requireRole(['AOE', 'COORDENACAO']);
+    requirePost();
+    try {
+        $actor = activeStaffId(['AOE', 'COORDENACAO']);
+        $communicationId = Bson::objectId($_POST['communication_id'] ?? null);
+        if ($communicationId === null) {
+            throw new InvalidArgumentException('Comunicação inválida.');
+        }
+        $absenceId = (new MongoOccurrences(Mongo::database()))->retry($actor, $communicationId, baseUrl());
+        flash('Novo envio colocado na fila.');
+        Auth::redirect('/ausencias/' . $absenceId);
+    } catch (InvalidArgumentException|DomainException $error) {
+        flash($error->getMessage(), 'error');
+        Auth::redirect('/ocorrencias');
+    }
+}
+if ($path === '/chamada') {
     Auth::requireRole(['AOE', 'COORDENACAO']);
     if ($method === 'GET') {
         renderMongoAttendance();
@@ -322,7 +498,7 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
     requirePost();
     try {
         $values = [];
-        foreach (['name', 'grade', 'shift', 'registration_no', 'email', 'relationship', 'class_id'] as $field) {
+        foreach (['name', 'grade', 'shift', 'registration_no', 'email', 'relationship', 'class_id', 'birth_date', 'phone'] as $field) {
             $values[$field] = $_POST[$field] ?? '';
         }
         foreach ($values as $value) {
@@ -368,9 +544,9 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
                 throw new InvalidArgumentException('Turma inválida.');
             }
             if ($targetId === null) {
-                $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId);
+                $directory->createStudent($actor, $values['name'], $values['registration_no'], $classId, $values['birth_date']);
             } else {
-                $directory->updateStudent($actor, $targetId, $values['name'], $values['registration_no'], $classId);
+                $directory->updateStudent($actor, $targetId, $values['name'], $values['registration_no'], $classId, $values['birth_date']);
             }
         } else {
             $studentIds = $_POST['student_ids'] ?? [];
@@ -386,9 +562,9 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
                 $ids[] = $id;
             }
             if ($targetId === null) {
-                $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids);
+                $directory->createGuardian($actor, $values['name'], $values['email'], $values['relationship'], $ids, $values['phone']);
             } else {
-                $directory->updateGuardian($actor, $targetId, $values['name'], $values['email'], $values['relationship'], $ids);
+                $directory->updateGuardian($actor, $targetId, $values['name'], $values['email'], $values['relationship'], $ids, $values['phone']);
             }
         }
         flash('Cadastro escolar salvo.');

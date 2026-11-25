@@ -14,7 +14,14 @@ use function MongoDB\with_transaction;
 /** O token da comunicação é a única credencial da página do responsável. */
 final class MongoJustification
 {
-    private const REASONS = ['DOENCA', 'CONSULTA_MEDICA', 'PROBLEMA_FAMILIAR', 'TRANSPORTE', 'OUTRO'];
+    /** Código gravado no banco => rótulo exibido. */
+    public const REASONS = [
+        'DOENCA' => 'Doença',
+        'CONSULTA_MEDICA' => 'Consulta médica',
+        'PROBLEMA_FAMILIAR' => 'Problema familiar',
+        'TRANSPORTE' => 'Problema de transporte',
+        'OUTRO' => 'Outro',
+    ];
 
     public function __construct(private readonly Database $database)
     {
@@ -74,7 +81,7 @@ final class MongoJustification
 
     public function submit(string $token, string $reason, string $explanation): void
     {
-        if (!in_array($reason, self::REASONS, true)) {
+        if (!array_key_exists($reason, self::REASONS)) {
             throw new InvalidArgumentException('Selecione um motivo válido.');
         }
         $explanation = trim($explanation);

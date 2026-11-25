@@ -3,7 +3,7 @@
     <div>
         <span class="eyebrow">Homologação MongoDB</span>
         <h1>Registrar chamada</h1>
-        <p>Marque todos os alunos ativos como presentes ou ausentes.</p>
+        <p>Todos os alunos começam como <strong>presentes</strong>. Marque apenas os <strong>ausentes</strong>.</p>
     </div>
 </section>
 <div class="notice notice-warning" role="status">
@@ -38,7 +38,7 @@
             <input id="absence_date" name="absence_date" type="date" required value="<?= e($absenceDate) ?>">
         </div>
         <fieldset class="student-picker">
-            <legend>Chamada da turma <span class="legend-note">Informe a situação de cada aluno</span></legend>
+            <legend>Chamada da turma <span class="legend-note">Marque somente quem faltou</span></legend>
             <?php if ($students === []): ?>
                 <p class="muted">Não há alunos ativos nesta turma.</p>
             <?php elseif (count($students) > 1000): ?>
@@ -49,9 +49,9 @@
                         <?php $studentKey = (string)$student['_id']; ?>
                         <fieldset class="student-option attendance-option">
                             <legend><strong><?= e($student['name']) ?></strong><small><?= e($student['registration_no'] ?? 'Sem matrícula informada') ?></small></legend>
-                            <label><input type="radio" name="attendance[<?= e($studentKey) ?>]" value="PRESENTE" required
-                                <?= ($selectedAttendance[$studentKey] ?? null) === 'PRESENTE' ? 'checked' : '' ?>> Presente</label>
-                            <label><input type="radio" name="attendance[<?= e($studentKey) ?>]" value="AUSENTE" required
+                            <?php /* Quem não for marcado como ausente segue como presente: o campo oculto vem antes e a caixa, se marcada, vence (mesmo nome, vale o último valor). */ ?>
+                            <input type="hidden" name="attendance[<?= e($studentKey) ?>]" value="PRESENTE">
+                            <label><input type="checkbox" name="attendance[<?= e($studentKey) ?>]" value="AUSENTE"
                                 <?= ($selectedAttendance[$studentKey] ?? null) === 'AUSENTE' ? 'checked' : '' ?>> Ausente</label>
                         </fieldset>
                     <?php endforeach; ?>
@@ -59,7 +59,7 @@
             <?php endif; ?>
         </fieldset>
         <?php if ($students !== [] && count($students) <= 1000): ?>
-            <div class="form-actions"><button class="button button-primary" type="submit">Concluir chamada de homologação</button></div>
+            <div class="form-actions"><button class="button button-primary" type="submit">Concluir chamada</button></div>
         <?php endif; ?>
     </form>
 <?php else: ?>

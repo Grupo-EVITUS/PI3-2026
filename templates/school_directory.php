@@ -38,6 +38,7 @@
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <label>Nome <input name="name" maxlength="120" required></label>
         <label>Matrícula <input name="registration_no" maxlength="80"></label>
+        <label>Data de nascimento <input name="birth_date" type="date" min="1900-01-01" max="<?= e(date('Y-m-d')) ?>"></label>
         <label>Turma <select name="class_id" required>
             <option value="">Selecione</option>
             <?php foreach ($classes as $class): ?>
@@ -47,12 +48,13 @@
         <button class="button button-primary">Cadastrar aluno</button>
     </form>
     <?php foreach ($students as $student): ?>
-        <details><summary><?= e($student['name']) ?></summary>
+        <details><summary><?= e($student['name']) ?><?= !empty($student['birth_date']) ? ' · nasc. ' . e(date('d/m/Y', strtotime($student['birth_date']))) : '' ?></summary>
             <form method="post" action="/cadastros/aluno" class="stack-form">
                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                 <input type="hidden" name="id" value="<?= e((string)$student['_id']) ?>">
                 <label>Nome <input name="name" maxlength="120" value="<?= e($student['name']) ?>" required></label>
                 <label>Matrícula <input name="registration_no" maxlength="80" value="<?= e($student['registration_no'] ?? '') ?>"></label>
+                <label>Data de nascimento <input name="birth_date" type="date" min="1900-01-01" max="<?= e(date('Y-m-d')) ?>" value="<?= e($student['birth_date'] ?? '') ?>"></label>
                 <label>Turma <select name="class_id" required>
                     <?php foreach ($classes as $class): ?>
                         <option value="<?= e((string)$class['_id']) ?>" <?= (string)$student['class_id'] === (string)$class['_id'] ? 'selected' : '' ?>><?= e($class['name']) ?></option>
@@ -75,6 +77,7 @@
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <label>Nome <input name="name" maxlength="120" required></label>
         <label>E-mail <input name="email" type="email" maxlength="254" required></label>
+        <label>Telefone <input name="phone" type="tel" inputmode="tel" maxlength="25" placeholder="(11) 91234-5678" autocomplete="off"></label>
         <label>Parentesco <input name="relationship" maxlength="80" required></label>
         <fieldset><legend>Alunos vinculados</legend>
             <?php foreach ($students as $student): ?>
@@ -85,13 +88,14 @@
     </form>
     <?php foreach ($guardians as $guardian): ?>
         <?php $devices = (int)(($pushDevices ?? [])[(string)$guardian['_id']] ?? 0); ?>
-        <details><summary><?= e($guardian['name']) ?> · <?= e($guardian['email']) ?>
+        <details><summary><?= e($guardian['name']) ?> · <?= e($guardian['email']) ?><?= !empty($guardian['phone']) ? ' · ' . e(formatPhone($guardian['phone'])) : '' ?>
             · <span class="push-badge<?= $devices > 0 ? ' push-badge-on' : '' ?>"><?= $devices > 0 ? 'Push em ' . $devices . ' aparelho(s)' : 'Somente e-mail' ?></span></summary>
             <form method="post" action="/cadastros/responsavel" class="stack-form">
                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                 <input type="hidden" name="id" value="<?= e((string)$guardian['_id']) ?>">
                 <label>Nome <input name="name" maxlength="120" value="<?= e($guardian['name']) ?>" required></label>
                 <label>E-mail <input name="email" type="email" maxlength="254" value="<?= e($guardian['email']) ?>" required></label>
+                <label>Telefone <input name="phone" type="tel" inputmode="tel" maxlength="25" placeholder="(11) 91234-5678" autocomplete="off" value="<?= e(formatPhone($guardian['phone'] ?? null)) ?>"></label>
                 <label>Parentesco <input name="relationship" maxlength="80" value="<?= e($guardian['relationship']) ?>" required></label>
                 <fieldset><legend>Alunos vinculados</legend>
                     <?php foreach ($students as $student): ?>

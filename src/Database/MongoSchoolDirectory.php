@@ -35,15 +35,17 @@ final class MongoSchoolDirectory
         }, 'TURMA_CRIADA', 'turma');
     }
 
-    public function createStudent(ObjectId $actor, string $name, ?string $registration, ObjectId $classId): ObjectId
-    {
+    public function createStudent(
+        ObjectId $actor, string $name, ?string $registration, ObjectId $classId, ?string $birthDate = null
+    ): ObjectId {
         $name = self::requiredText($name, 120);
         $registration = $registration === null || trim($registration) === ''
             ? null : self::requiredText($registration, 80);
-        return $this->write($actor, function (Session $session, ObjectId $id) use ($name, $registration, $classId): void {
+        $birthDate = self::birthDate($birthDate);
+        return $this->write($actor, function (Session $session, ObjectId $id) use ($name, $registration, $classId, $birthDate): void {
             $this->touchActive('classes', $classId, $session, 'Turma não encontrada ou inativa.');
             $this->database->students->insertOne([
-                '_id' => $id, 'name' => $name, 'registration_no' => $registration,
+                '_id' => $id, 'name' => $name, 'registration_no' => $registration, 'birth_date' => $birthDate,
                 'class_id' => $classId, 'active' => true, 'created_at' => new UTCDateTime(),
             ], ['session' => $session]);
         }, 'ALUNO_CRIADO', 'aluno');
@@ -51,11 +53,12 @@ final class MongoSchoolDirectory
 
     /** @param list<ObjectId> $studentIds */
     public function createGuardian(
-        ObjectId $actor, string $name, string $email, string $relationship, array $studentIds
+        ObjectId $actor, string $name, string $email, string $relationship, array $studentIds, ?string $phone = null
     ): ObjectId {
         $name = self::requiredText($name, 120);
         $email = strtolower(trim($email));
         $relationship = self::requiredText($relationship, 80);
+        $phone = self::phone($phone);
         if (strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('E-mail do responsável inválido.');
         }
@@ -66,7 +69,7 @@ final class MongoSchoolDirectory
             }
             $unique[(string)$studentId] = $studentId;
         }
-        return $this->write($actor, function (Session $session, ObjectId $id) use ($name, $email, $relationship, $unique): void {
+        return $this->write($actor, function (Session $session, ObjectId $id) use ($name, $email, $relationship, $unique, $phone): void {
             $options = ['session' => $session];
             if ($unique !== [] && $this->database->students->countDocuments(
                 ['_id' => ['$in' => array_values($unique)], 'active' => true], $options
@@ -77,7 +80,7 @@ final class MongoSchoolDirectory
                 $this->touchActive('students', $studentId, $session, 'Aluno não encontrado ou inativo.');
             }
             $this->database->guardians->insertOne([
-                '_id' => $id, 'name' => $name, 'email' => $email, 'relationship' => $relationship,
+                '_id' => $id, 'name' => $name, 'email' => $email, 'phone' => $phone, 'relationship' => $relationship,
                 'active' => true, 'created_at' => new UTCDateTime(),
             ], $options);
             foreach ($unique as $studentId) {
@@ -109,17 +112,19 @@ final class MongoSchoolDirectory
     }
 
     public function updateStudent(
-        ObjectId $actor, ObjectId $studentId, string $name, ?string $registration, ObjectId $classId
+        ObjectId $actor, ObjectId $studentId, string $name, ?string $registration, ObjectId $classId,
+        ?string $birthDate = null
     ): ObjectId {
         $name = self::requiredText($name, 120);
         $registration = $registration === null || trim($registration) === ''
             ? null : self::requiredText($registration, 80);
-        return $this->write($actor, function (Session $session) use ($studentId, $name, $registration, $classId): void {
+        $birthDate = self::birthDate($birthDate);
+        return $this->write($actor, function (Session $session) use ($studentId, $name, $registration, $classId, $birthDate): void {
             $options = ['session' => $session];
             $this->touchActive('classes', $classId, $session, 'Turma não encontrada ou inativa.');
             $result = $this->database->students->updateOne(
                 ['_id' => $studentId, 'active' => true],
-                ['$set' => ['name' => $name, 'registration_no' => $registration, 'class_id' => $classId]],
+                ['$set' => ['name' => $name, 'registration_no' => $registration, 'birth_date' => $birthDate, 'class_id' => $classId]],
                 $options
             );
             if ($result->getMatchedCount() !== 1) {
@@ -130,11 +135,13 @@ final class MongoSchoolDirectory
 
     /** @param list<ObjectId> $studentIds */
     public function updateGuardian(
-        ObjectId $actor, ObjectId $guardianId, string $name, string $email, string $relationship, array $studentIds
+        ObjectId $actor, ObjectId $guardianId, string $name, string $email, string $relationship, array $studentIds,
+        ?string $phone = null
     ): ObjectId {
         $name = self::requiredText($name, 120);
         $email = strtolower(trim($email));
         $relationship = self::requiredText($relationship, 80);
+        $phone = self::phone($phone);
         if (strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('E-mail do responsável inválido.');
         }
@@ -145,7 +152,7 @@ final class MongoSchoolDirectory
             }
             $unique[(string)$studentId] = $studentId;
         }
-        return $this->write($actor, function (Session $session) use ($guardianId, $name, $email, $relationship, $unique): void {
+        return $this->write($actor, function (Session $session) use ($guardianId, $name, $email, $relationship, $unique, $phone): void {
             $options = ['session' => $session];
             if ($unique !== [] && $this->database->students->countDocuments(
                 ['_id' => ['$in' => array_values($unique)], 'active' => true], $options
@@ -157,7 +164,7 @@ final class MongoSchoolDirectory
             }
             $result = $this->database->guardians->updateOne(
                 ['_id' => $guardianId, 'active' => true],
-                ['$set' => ['name' => $name, 'email' => $email, 'relationship' => $relationship]], $options
+                ['$set' => ['name' => $name, 'email' => $email, 'phone' => $phone, 'relationship' => $relationship]], $options
             );
             if ($result->getMatchedCount() !== 1) {
                 throw new InvalidArgumentException('Responsável não encontrado ou inativo.');
@@ -252,6 +259,44 @@ final class MongoSchoolDirectory
         if ($result->getMatchedCount() !== 1) {
             throw new InvalidArgumentException($message);
         }
+    }
+
+    /** Data de nascimento opcional (AAAA-MM-DD), de calendário válido, entre 1900 e hoje. */
+    private static function birthDate(?string $value): ?string
+    {
+        $value = $value === null ? '' : trim($value);
+        if ($value === '') {
+            return null;
+        }
+        if (!Bson::isDay($value) || $value < '1900-01-01' || $value > date('Y-m-d')) {
+            throw new InvalidArgumentException('Data de nascimento inválida.');
+        }
+        return $value;
+    }
+
+    /**
+     * Telefone opcional, guardado só com dígitos: DDD + 8 ou 9 dígitos (celular começa em 9).
+     * Aceita máscara e o código do país (+55).
+     */
+    public static function normalizePhone(string $value): string
+    {
+        $value = trim($value);
+        if (preg_match('/^\+?[0-9 ().\-]{8,25}$/', $value) !== 1) {
+            throw new InvalidArgumentException('Telefone inválido. Informe DDD e número, por exemplo (11) 91234-5678.');
+        }
+        $digits = (string)preg_replace('/\D/', '', $value);
+        if (in_array(strlen($digits), [12, 13], true) && str_starts_with($digits, '55')) {
+            $digits = substr($digits, 2);
+        }
+        if (preg_match('/^[1-9][1-9]([2-9][0-9]{7}|9[0-9]{8})$/', $digits) !== 1) {
+            throw new InvalidArgumentException('Telefone inválido. Informe DDD e número, por exemplo (11) 91234-5678.');
+        }
+        return $digits;
+    }
+
+    private static function phone(?string $value): ?string
+    {
+        return $value === null || trim($value) === '' ? null : self::normalizePhone($value);
     }
 
     private static function requiredText(string $value, int $maxBytes): string

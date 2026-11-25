@@ -10,7 +10,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Cliente MongoDB aditivo para a etapa 2. Não altera o runtime SQLite nem realiza dual-write.
+ * Cliente MongoDB do SAA.
  * A URI nunca é incluída em mensagens de erro ou logs.
  */
 final class Mongo

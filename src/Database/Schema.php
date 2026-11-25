@@ -43,11 +43,13 @@ final class Schema
             Collections::STUDENTS => $schema(
                 ['name', 'class_id', 'active', 'created_at'],
                 ['name' => $text, 'class_id' => $id, 'registration_no' => ['bsonType' => ['string', 'null']],
+                 'birth_date' => ['bsonType' => ['string', 'null'], 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
                  'active' => $active, 'created_at' => $date, 'link_revision' => ['bsonType' => ['int', 'long']]]
             ),
             Collections::GUARDIANS => $schema(
                 ['name', 'email', 'relationship', 'active', 'created_at'],
-                ['name' => $text, 'email' => $text, 'relationship' => $text, 'active' => $active, 'created_at' => $date]
+                ['name' => $text, 'email' => $text, 'relationship' => $text, 'active' => $active, 'created_at' => $date,
+                 'phone' => ['bsonType' => ['string', 'null'], 'pattern' => '^[0-9]{10,11}$']]
             ),
             Collections::STUDENT_GUARDIANS => $schema(
                 ['student_id', 'guardian_id'], ['student_id' => $id, 'guardian_id' => $id]
@@ -103,6 +105,10 @@ final class Schema
                 ['absence_id' => $id, 'guardian_id' => $id, 'email_to' => $text, 'token_hash' => $text,
                  'status' => $enum(['PENDENTE', 'ENVIADO', 'FALHA']), 'created_at' => $date,
                  'sent_at' => $nullableDate, 'expires_at' => $nullableDate, 'retry_of_id' => $nullableId,
+                 // Marca a comunicação com falha que já ganhou reenvio (trava contra cliques duplicados).
+                 'retried_at' => $nullableDate,
+                 // Lembrete por e-mail de um push entregue que ficou sem justificativa.
+                 'reminder_of_id' => $nullableId,
                  'failure_detail' => ['bsonType' => ['string', 'null']],
                  // Ausente em comunicações legadas/importadas, que foram sempre por e-mail.
                  'channel' => $enum(['EMAIL', 'PUSH'])]
@@ -140,7 +146,22 @@ final class Schema
                  'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate,
                  'next_attempt_at' => $nullableDate, 'claim_id' => $nullableId,
                  'attempts' => ['bsonType' => ['int', 'long']],
-                 'failure_detail' => ['bsonType' => ['string', 'null']]]
+                 'failure_detail' => ['bsonType' => ['string', 'null']],
+                 // Lembrete por e-mail quando o push foi entregue e a ausência segue sem justificativa.
+                 'base_url' => ['bsonType' => ['string', 'null'], 'maxLength' => 300],
+                 'reminder_due_at' => $nullableDate,
+                 'reminder_status' => ['enum' => ['EMAIL_ENFILEIRADO', 'DISPENSADO', null]]]
+            ),
+            Collections::PASSWORD_RESETS => $schema(
+                ['user_id', 'token_hash', 'created_at', 'expires_at', 'mail_status', 'mail'],
+                ['user_id' => $id, 'token_hash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
+                 'created_at' => $date, 'expires_at' => $date,
+                 'used_at' => $nullableDate, 'revoked_at' => $nullableDate,
+                 'mail_status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'FALHA']),
+                 'mail' => ['bsonType' => 'object', 'required' => ['recipient', 'subject', 'body'],
+                     'properties' => ['recipient' => $text, 'subject' => $text, 'body' => $text]],
+                 'attempts' => ['bsonType' => ['int', 'long']], 'started_at' => $nullableDate,
+                 'next_attempt_at' => $nullableDate, 'processed_at' => $nullableDate, 'claim_id' => $nullableId]
             ),
             Collections::JUSTIFICATIONS => $schema(
                 ['absence_id', 'communication_id', 'guardian_id', 'reason', 'explanation', 'submitted_at'],
@@ -159,7 +180,7 @@ final class Schema
     public static function indexes(): array
     {
         return [
-            // ASCII NOCASE do SQLite é preservado por email_key, calculado pelo runtime/importador.
+            // E-mails são únicos sem diferenciar A-Z/a-z, via email_key calculado por Schema::emailKey.
             Collections::USERS => [
                 ['key' => ['email_key' => 1], 'name' => 'users_email_key_unique', 'unique' => true],
                 ['key' => ['is_initial_admin' => 1], 'name' => 'users_initial_admin_unique', 'unique' => true,
@@ -216,6 +237,14 @@ final class Schema
                 ['key' => ['status' => 1, 'created_at' => 1], 'name' => 'push_queue_status_created'],
                 ['key' => ['status' => 1, 'next_attempt_at' => 1], 'name' => 'push_queue_retry_due'],
                 ['key' => ['status' => 1, 'started_at' => 1], 'name' => 'push_queue_stale_lease'],
+                ['key' => ['status' => 1, 'reminder_due_at' => 1], 'name' => 'push_queue_reminder_due'],
+            ],
+            Collections::PASSWORD_RESETS => [
+                ['key' => ['token_hash' => 1], 'name' => 'password_reset_token_unique', 'unique' => true],
+                ['key' => ['user_id' => 1, 'created_at' => -1], 'name' => 'password_reset_user'],
+                ['key' => ['mail_status' => 1, 'created_at' => 1], 'name' => 'password_reset_mail_status'],
+                ['key' => ['mail_status' => 1, 'next_attempt_at' => 1], 'name' => 'password_reset_mail_retry'],
+                ['key' => ['mail_status' => 1, 'started_at' => 1], 'name' => 'password_reset_mail_lease'],
             ],
             Collections::JUSTIFICATIONS => [
                 ['key' => ['absence_id' => 1], 'name' => 'justification_absence_unique', 'unique' => true],
@@ -226,7 +255,7 @@ final class Schema
         ];
     }
 
-    /** SQLite NOCASE dobra somente A-Z; não altera caracteres não ASCII. */
+    /** Dobra somente A-Z; não altera caracteres não ASCII. */
     public static function emailKey(string $email): string
     {
         return strtr($email, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');

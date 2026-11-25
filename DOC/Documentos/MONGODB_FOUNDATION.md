@@ -1,8 +1,8 @@
-# Fundação MongoDB — subetapa 2b.3
+# Fundação MongoDB
 
 Implementa contratos das dez coleções legadas, índices e aplicação explícita reexecutável.
-Inclui criação segura da conta inicial e health check interno de prontidão. O runtime web
-permanece SQLite até o port integral da etapa 3. Não há dual-write.
+Inclui criação segura da conta inicial e health check interno de prontidão. MongoDB é o
+único armazenamento da aplicação.
 
 ## Execução
 Após instalar as dependências e configurar MONGODB_URI e MONGODB_DB:
@@ -26,17 +26,16 @@ O health check é somente leitura, restrito a CLI e confere estado de conexão, 
 validators (`strict`/`error`) e definições de índices (chaves, unicidade e filtro parcial).
 Também rejeita índices sparse, ocultos ou TTL, que poderiam alterar a semântica ou remover
 logs de auditoria. Não retorna URI, nome do banco, documentos nem mensagens do driver.
-Um endpoint HTTP de prontidão será avaliado quando o runtime MongoDB for implementado na etapa 3;
-não se expõe uma rota pública enquanto a aplicação web ainda usa SQLite.
+Não há endpoint HTTP de prontidão: a verificação é feita somente pela CLI.
 
 ## Contrato de migração
-- ObjectId em IDs/referências. Mapeamento dos IDs SQLite é trabalho da etapa 4.
+- ObjectId em IDs/referências.
 - Instantes são BSON date; absence_date é dia civil string AAAA-MM-DD.
   O validator verifica formato; Bson::isDay e o serviço devem validar o calendário.
 - active é booleano, convertido explicitamente de 0/1 pelo importador.
-- users.email_key é a dobra ASCII de email, como SQLite NOCASE.
+- users.email_key é a dobra ASCII (A-Z) de email.
   Schema::emailKey calcula a chave; o validator confere a igualdade no servidor.
-  O índice único não depende de collation Unicode diferente do SQLite.
+  O índice único não depende de collation Unicode.
 - users.is_initial_admin é opcional; quando true, um índice único parcial limita a criação
   da conta administrativa inicial a uma única conta, inclusive em execuções concorrentes.
 - registration_no ausente/nulo é permitido; unicidade somente para strings.
@@ -65,11 +64,8 @@ Entradas que não sejam texto, e-mail inválido e valores fora dos limites falha
 filtros Mongo com estruturas fornecidas pelo cliente. Usuário inexistente, inativo ou com
 credencial inválida não recebe identidade.
 
-Este componente ainda não está conectado ao login web, não cria sessão nem substitui o SQLite.
-As rotas e auditoria atuais dependem de IDs relacionais inteiros; a conexão só ocorrerá numa
-fatia coerente que porte também os consumidores da identidade, autorização, sessão e auditoria.
-O fluxo de justificativas e envio de e-mail permanece inalterado. O teste de autorização por
-rota e rotação de sessão pertence à integração HTTP futura, não a este adaptador isolado.
+O componente é usado pelo login web (`src/web.php`), que cria a sessão e rotaciona o ID.
+O teste de autorização por rota e rotação de sessão é coberto por `tests/Integration/staff_web.py`.
 
 ## Etapa 3.2a — gravador de auditoria isolado
 `MongoOperationLogWriter` acrescenta registros em `operation_logs` sem oferecer edição ou
@@ -78,12 +74,8 @@ exclusão. O ator usa ObjectId opcional, o ID da entidade é serializado como te
 dedicados para hash, token ou corpo de mensagem. Chamadores devem manter esses valores fora de
 `details` e gravar somente contexto operacional redigido.
 
-O gravador não substitui `Helpers::audit(PDO)` nem está conectado às rotas. A escrita de um
-usuário e seu evento ainda não é atômica nesta fatia. Quando 3.2a foi concluída, o CRUD de
-usuários junto com auditoria aguardava transações testadas em replica set. A subetapa 3.2b
-prepara agora essa topologia e o teste; só após o CI passar será possível considerar esse gate
-técnico validado. A migração de sessão/rotas também espera que todos os serviços consumidores
-usem ObjectId e MongoDB, sem mistura com PDO/IDs inteiros.
+O gravador é a única trilha de auditoria da aplicação e aceita uma sessão opcional para
+participar de transações (ver 3.2b).
 O contrato append-only limita a API do componente, não as permissões do usuário MongoDB. Antes
 da integração de runtime, restringir as permissões sobre `operation_logs` para impedir update e
 delete; validar também que cada chamador não inclua e-mail, token, hash ou conteúdo de mensagem

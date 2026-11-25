@@ -132,3 +132,112 @@ status, frequency = request(coord, "/frequencia?periodo=mes&referencia=2026-11-1
 assert status == 200 and "Frequência por aluno" in frequency
 assert "50,0%" in frequency and "Aluno Chamada A" in frequency
 assert "chamada@example.org" not in frequency
+
+# Ocorrências: o Diretor consulta; o reenvio é restrito à AOE/Coordenação e valida a comunicação.
+status, occurrences = request(director, "/ocorrencias")
+assert status == 200 and "Aluno Chamada A" in occurrences and "Pendente" in occurrences
+assert "Fazer chamada" not in occurrences
+assert request(director, "/ocorrencias?status=RESPONDIDA")[0] == 200
+assert "Nenhuma ocorrência nesta lista" in request(director, "/ocorrencias?status=RESPONDIDA")[1]
+assert request(director, "/ocorrencias?status=x")[0] == 422
+assert request(browser(), "/ocorrencias")[0] == 200  # Redirect para login.
+absence_id = re.search(r'href="/ausencias/([a-f0-9]{24})"', occurrences)[1]
+status, detail = request(director, "/ausencias/" + absence_id)
+assert status == 200 and "Aluno Chamada A" in detail and "Aguardando resposta" in detail
+assert "Contato da chamada" in detail and "Reenviar" not in detail
+assert request(director, "/ausencias/" + "0" * 24)[0] == 404
+assert request(director, "/ausencias/nao-e-um-id")[0] == 404
+assert request(director, "/comunicacoes/reenvio", {"communication_id": "0" * 24})[0] == 400
+assert request(director, "/comunicacoes/reenvio", dict(
+    communication_id="0" * 24, csrf_token=csrf(occurrences)))[0] == 403
+status, retried = request(aoe, "/comunicacoes/reenvio", dict(
+    communication_id="0" * 24, csrf_token=csrf(attendance_page)))
+assert status == 200 and "Comunicação não encontrada." in retried
+
+# Filtros por turma, aluno e período; entradas inválidas são recusadas antes do banco.
+status, filtered = request(director, "/ocorrencias?status=PENDENTE&turma_id=%s&aluno_id=%s&de=2026-11-15&ate=2026-11-15" % (
+    attendance_class, first_id))
+assert status == 200 and filtered.count('href="/ausencias/') == 1 and "1 ocorrência(s)" in filtered
+assert "Resultado da busca" in filtered and 'href="/ocorrencias">Limpar' in filtered
+status, none = request(director, "/ocorrencias?de=2026-11-16")
+assert status == 200 and '/ausencias/' not in none and "Ajuste ou limpe os filtros" in none
+status, none = request(director, "/ocorrencias?turma_id=" + class_id)
+assert status == 200 and '/ausencias/' not in none
+for bad in ["turma_id=%24ne", "aluno_id=abc", "de=2026-11-20&ate=2026-11-01", "de=2026-02-30", "de%5B%5D=x"]:
+    assert request(director, "/ocorrencias?" + bad)[0] == 422, bad
+
+# Data de nascimento do aluno e telefone do responsável pela tela de cadastros.
+status, directory = request(coord, "/cadastros")
+assert status == 200 and 'name="birth_date"' in directory and 'name="phone"' in directory
+token = csrf(directory)
+base_student = dict(name="Aluno Nascimento", registration_no="NS-001", class_id=attendance_class, csrf_token=token)
+for bad in ["05/03/2014", "2014-02-30", "1899-12-31", "2999-01-01"]:
+    status, result = request(coord, "/cadastros/aluno", dict(base_student, birth_date=bad))
+    assert status == 422 and "Data de nascimento inválida" in result, bad
+status, result = request(coord, "/cadastros/aluno", dict(base_student, birth_date="2014-03-05"))
+assert status == 200 and "Aluno Nascimento · nasc. 05/03/2014" in result
+birth_student = re.search(r'value="([a-f0-9]{24})"> Aluno Nascimento', result)[1]
+base_guardian = {"name": "Responsável Fone", "email": "fone@example.org", "relationship": "Pai",
+                 "student_ids[]": birth_student, "csrf_token": csrf(result)}
+for bad in ["abc", "12345", "(01) 91234-5678", "11 81234-5678"]:
+    status, result = request(coord, "/cadastros/responsavel", dict(base_guardian, phone=bad))
+    assert status == 422 and "Telefone inválido" in result, bad
+status, result = request(coord, "/cadastros/responsavel", dict(base_guardian, phone="+55 (11) 91234-5678"))
+assert status == 200 and "Responsável Fone · fone@example.org · (11) 91234-5678" in result
+assert request(aoe, "/cadastros/aluno", dict(base_student, birth_date="2014-03-05", csrf_token=csrf(attendance_page)))[0] == 403
+
+# Listagem de funcionários: só a Coordenação; nunca expõe senha; busca e filtros validados.
+status, staff_page = request(coord, "/funcionarios")
+assert status == 200 and "3 funcionário(s)" in staff_page and 'href="/funcionarios"' in staff_page
+for address in ["coord@example.org", "aoe@example.org", "diretor@example.org"]:
+    assert address in staff_page, address
+assert "password" not in staff_page.lower().replace('type="password"', "") and "$2y$" not in staff_page
+status, found = request(coord, "/funcionarios?busca=DIRETOR")
+assert status == 200 and "1 funcionário(s)" in found and "diretor@example.org" in found and "aoe@example.org" not in found
+status, found = request(coord, "/funcionarios?perfil=AOE")
+assert status == 200 and "1 funcionário(s)" in found and "aoe@example.org" in found
+status, found = request(coord, "/funcionarios?situacao=inativos")
+assert status == 200 and "Nenhum funcionário encontrado" in found
+status, found = request(coord, "/funcionarios?busca=.*")
+assert status == 200 and "Nenhum funcionário encontrado" in found
+for bad in ["perfil=ADMIN", "situacao=talvez", "busca%5B%5D=x", "perfil=%24ne"]:
+    assert request(coord, "/funcionarios?" + bad)[0] == 422, bad
+assert request(aoe, "/funcionarios")[0] == 403
+assert request(director, "/funcionarios")[0] == 403
+assert request(browser(), "/funcionarios")[0] == 200  # Redirect para login.
+assert request(coord, "/funcionarios", {"csrf_token": csrf(staff_page)})[0] == 405
+
+# Chamada: todos começam presentes e só os ausentes são marcados (campo oculto + caixa com o mesmo nome).
+status, directory = request(coord, "/cadastros")
+status, result = request(coord, "/cadastros/turma", dict(
+    name="Turma Padrão", grade="7º ano", academic_year="2026", shift="Manhã", csrf_token=csrf(directory)))
+assert status == 200
+default_class = re.search(r'<option value="([a-f0-9]{24})">Turma Padrão</option>', result)[1]
+for name, registration in [("Padrão A", "PD-001"), ("Padrão B", "PD-002")]:
+    status, result = request(coord, "/cadastros/aluno", dict(
+        name=name, registration_no=registration, class_id=default_class, csrf_token=csrf(result)))
+    assert status == 200 and name in result
+status, page = request(aoe, "/chamada?turma_id=" + default_class)
+assert status == 200 and "Marque somente quem faltou" in page and 'type="radio"' not in page
+assert page.count('type="checkbox" name="attendance[') == 2 and " checked" not in page
+default_ids = re.findall(r'type="hidden" name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', page)
+assert len(default_ids) == 2
+
+
+def attendance_form(date, absent=(), include=None):
+    fields = [("class_id", default_class), ("absence_date", date), ("csrf_token", csrf(page))]
+    for student in (default_ids if include is None else include):
+        fields.append(("attendance[%s]" % student, "PRESENTE"))
+        if student in absent:
+            fields.append(("attendance[%s]" % student, "AUSENTE"))
+    return fields
+
+
+status, result = request(aoe, "/chamada", attendance_form("2026-11-16"))  # ninguém marcado: todos presentes
+assert status == 200 and "2 presente(s) e" in result and "0 ausente(s)" in result and "0 comunicação(ões) aguardam" in result
+status, result = request(aoe, "/chamada", attendance_form("2026-11-17", absent=[default_ids[0]]))
+assert status == 200 and "1 presente(s) e" in result and "1 ausente(s)" in result
+assert "Sem responsável ativo para: Padrão A." in result
+status, result = request(aoe, "/chamada", attendance_form("2026-11-18", include=[default_ids[0]], absent=[default_ids[0]]))
+assert status == 422 and "todos os alunos ativos" in result  # a chamada continua exigindo a turma inteira
+assert re.search(r'value="AUSENTE"\s+checked', result)  # a marcação é mantida após o erro

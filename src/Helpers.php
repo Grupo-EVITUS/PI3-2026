@@ -6,21 +6,23 @@ function e(mixed $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-function mongoAttendancePreviewEnabled(): bool
+/** Telefone guardado só com dígitos (10 ou 11) para exibição: (11) 91234-5678. */
+function formatPhone(?string $digits): string
 {
-    return getenv('SAA_WEB_MODE') === 'mongo_staff'
-        && strtolower(getenv('SAA_MONGO_ATTENDANCE_PREVIEW') ?: '') === 'true';
+    if ($digits === null || preg_match('/^[0-9]{10,11}$/', $digits) !== 1) {
+        return (string)$digits;
+    }
+    $split = strlen($digits) - 4;
+    return '(' . substr($digits, 0, 2) . ') ' . substr($digits, 2, $split - 2) . '-' . substr($digits, $split);
 }
 
 function staffHomePath(): string
 {
-    if (getenv('SAA_WEB_MODE') !== 'mongo_staff') {
-        return '/ocorrencias';
-    }
-    if (($_SESSION['profile'] ?? '') === 'DIRETOR') {
-        return '/frequencia';
-    }
-    return ($_SESSION['profile'] ?? '') === 'AOE' && mongoAttendancePreviewEnabled() ? '/chamada' : '/cadastros';
+    return match ($_SESSION['profile'] ?? '') {
+        'DIRETOR' => '/frequencia',
+        'AOE' => '/chamada',
+        default => '/cadastros',
+    };
 }
 
 function render(string $template, array $data = []): void
@@ -52,14 +54,6 @@ function requirePost(): void
         exit('Método não permitido.');
     }
     Auth::validateCsrf();
-}
-
-function audit(PDO $pdo, ?int $userId, string $action, string $entity, ?int $entityId, string $details = ''): void
-{
-    $statement = $pdo->prepare(
-        'INSERT INTO operation_logs (user_id, action, entity, entity_id, details, happened_at) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    $statement->execute([$userId, $action, $entity, $entityId, $details, Database::now()]);
 }
 
 function baseUrl(string $path = ''): string

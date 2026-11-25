@@ -113,6 +113,27 @@ try {
         && $db->push_subscriptions->countDocuments(['last_success_at' => ['$type' => 'date']]) === 1, 'entrega não registrada.');
     pushAssert($worker->process(static fn(): int => throw new LogicException('reenvio')) === 0, 'reenvio após conclusão.');
 
+    // Push entregue sem justificativa: lembrete por e-mail só depois do prazo, uma única vez, com link próprio.
+    pushAssert($job['reminder_due_at'] instanceof UTCDateTime
+        && $job['reminder_due_at']->toDateTime()->getTimestamp() > time() + 23 * 3600
+        && $job['base_url'] === 'https://escola.example.org', 'lembrete não agendado.');
+    pushAssert($worker->remindUnanswered() === 0, 'lembrete antes do prazo.');
+    $db->push_queue->updateOne(['_id' => $job['_id']], ['$set' => ['reminder_due_at' => new UTCDateTime(0)]]);
+    pushAssert($worker->remindUnanswered() === 1 && $worker->remindUnanswered() === 0, 'lembrete não processado uma única vez.');
+    $reminder = $db->communications->findOne(['reminder_of_id' => $job['communication_id']]);
+    $reminderMail = $reminder === null ? null : $db->mail_queue->findOne(['communication_id' => $reminder['_id']]);
+    pushAssert($reminder !== null && $reminder['channel'] === 'EMAIL' && $reminder['status'] === 'PENDENTE'
+        && $reminderMail !== null && $reminderMail['recipient'] === 'mae@example.org'
+        && str_starts_with($reminderMail['subject'], 'Lembrete:')
+        && str_contains($reminderMail['body'], 'ainda não recebemos a justificativa')
+        && str_contains($reminderMail['body'], 'https://escola.example.org/justificar/')
+        && !str_contains($reminderMail['body'], $token), 'lembrete por e-mail incorreto.');
+    $job = $db->push_queue->findOne(['_id' => $job['_id']]);
+    pushAssert($job['reminder_status'] === 'EMAIL_ENFILEIRADO' && $job['reminder_due_at'] === null
+        && $job['base_url'] === null, 'desfecho do lembrete não registrado.');
+    pushAssert($db->push_queue->countDocuments(['communication_id' => $reminder['_id']]) === 0,
+        'lembrete foi para o push em vez do e-mail.');
+
     // Aparelho extinto (410): desativado e aviso encaminhado por e-mail na mesma transação.
     $absentOn('2026-11-17');
     $worker->process(static fn(): int => 410);
@@ -175,7 +196,31 @@ try {
         && $db->operation_logs->countDocuments(['action' => 'PUSH_ENVIADO']) === 1
         && $db->operation_logs->countDocuments(['action' => 'PUSH_ENCAMINHADO_EMAIL']) === 2, 'auditoria do push incompleta.');
 
-    fwrite(STDOUT, "MongoPushTest: convite, roteamento, entrega, retry, aparelho extinto e e-mail de reserva passaram.\n");
+    // Ausência já justificada pelo link do push: o lembrete é dispensado, sem novo e-mail.
+    $absentOn('2026-11-23');
+    $answered = null;
+    // A fila ainda tem o aviso de 20/11 (aparelho novo da mãe); o último entregue é o de 23/11.
+    $worker->process(static function (array $subscription, string $payload) use (&$answered): int {
+        $answered = json_decode($payload, true);
+        return 201;
+    });
+    (new MongoJustification($db))->submit(substr((string)$answered['url'], strlen('/justificar/')), 'DOENCA', '');
+    $mailsBefore = $db->mail_queue->countDocuments();
+    $db->push_queue->updateOne(['communication_id' => new MongoDB\BSON\ObjectId(substr($answered['tag'], 4))],
+        ['$set' => ['reminder_due_at' => new UTCDateTime(0)]]);
+    pushAssert($worker->remindUnanswered() === 1 && $db->mail_queue->countDocuments() === $mailsBefore
+        && $db->push_queue->countDocuments(['reminder_status' => 'DISPENSADO']) === 1
+        && $db->operation_logs->countDocuments(['action' => 'PUSH_LEMBRETE_DISPENSADO', 'details' => 'Ausência já respondida.']) === 1
+        && $db->operation_logs->countDocuments(['action' => 'PUSH_LEMBRETE_EMAIL']) === 1, 'lembrete de ausência respondida.');
+
+    // Lembrete desligado (0 horas): entrega não agenda lembrete.
+    $absentOn('2026-11-24');
+    (new MongoPushQueue($db, 0))->process(static fn(): int => 201);
+    pushAssert($db->push_queue->countDocuments(['status' => 'CONCLUIDO', 'reminder_due_at' => null, 'reminder_status' => null,
+        'base_url' => null]) === 1, 'lembrete agendado com o recurso desligado.');
+    pushFails(fn() => new MongoPushQueue($db, 169), InvalidArgumentException::class, 'prazo de lembrete acima de 168 horas');
+
+    fwrite(STDOUT, "MongoPushTest: convite, roteamento, entrega, retry, aparelho extinto, e-mail de reserva e lembrete passaram.\n");
 } finally {
     $db->drop();
 }

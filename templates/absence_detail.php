@@ -26,7 +26,7 @@ $channelLabels = ['EMAIL' => 'E-mail', 'PUSH' => 'Notificação push'];
                     <article class="result-row">
                         <div>
                             <strong><?= e($communication['guardian_name']) ?></strong>
-                            <small><?= e($communication['email_to']) ?> · <?= e($channelLabels[$communication['channel']] ?? $communication['channel']) ?><?= $communication['is_retry'] ? ' · reenvio' : '' ?></small>
+                            <small><?= e($communication['email_to']) ?> · <?= e($channelLabels[$communication['channel']] ?? $communication['channel']) ?><?= $communication['is_retry'] ? ' · reenvio' : '' ?><?= $communication['is_reminder'] ? ' · lembrete (push sem resposta)' : '' ?></small>
                             <?php if ($communication['failure_detail']): ?><small class="error-text"><?= e($communication['failure_detail']) ?></small><?php endif; ?>
                         </div>
                         <span class="status status-<?= e(strtolower($communication['status'])) ?>"><?= e(ucfirst(strtolower($communication['status']))) ?><?= $communication['retried'] ? ' · reenviada' : '' ?></span>

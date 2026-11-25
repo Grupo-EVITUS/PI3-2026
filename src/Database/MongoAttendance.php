@@ -180,6 +180,8 @@ final class MongoAttendance
                                 'body' => $entry['student_name'] . ' não compareceu à turma ' . $class['name']
                                     . ' em ' . $day . '. Toque para enviar a justificativa.',
                                 'url' => $path, 'fallback_email' => $email,
+                                // Endereço público do lembrete por e-mail, caso o push entregue fique sem resposta.
+                                'base_url' => $baseUrl,
                                 'status' => 'AGUARDANDO', 'created_at' => $now,
                             ], $options);
                             $pushNotifications++;

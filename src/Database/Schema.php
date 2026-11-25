@@ -105,6 +105,10 @@ final class Schema
                 ['absence_id' => $id, 'guardian_id' => $id, 'email_to' => $text, 'token_hash' => $text,
                  'status' => $enum(['PENDENTE', 'ENVIADO', 'FALHA']), 'created_at' => $date,
                  'sent_at' => $nullableDate, 'expires_at' => $nullableDate, 'retry_of_id' => $nullableId,
+                 // Marca a comunicação com falha que já ganhou reenvio (trava contra cliques duplicados).
+                 'retried_at' => $nullableDate,
+                 // Lembrete por e-mail de um push entregue que ficou sem justificativa.
+                 'reminder_of_id' => $nullableId,
                  'failure_detail' => ['bsonType' => ['string', 'null']],
                  // Ausente em comunicações legadas/importadas, que foram sempre por e-mail.
                  'channel' => $enum(['EMAIL', 'PUSH'])]
@@ -142,7 +146,11 @@ final class Schema
                  'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate,
                  'next_attempt_at' => $nullableDate, 'claim_id' => $nullableId,
                  'attempts' => ['bsonType' => ['int', 'long']],
-                 'failure_detail' => ['bsonType' => ['string', 'null']]]
+                 'failure_detail' => ['bsonType' => ['string', 'null']],
+                 // Lembrete por e-mail quando o push foi entregue e a ausência segue sem justificativa.
+                 'base_url' => ['bsonType' => ['string', 'null'], 'maxLength' => 300],
+                 'reminder_due_at' => $nullableDate,
+                 'reminder_status' => ['enum' => ['EMAIL_ENFILEIRADO', 'DISPENSADO', null]]]
             ),
             Collections::PASSWORD_RESETS => $schema(
                 ['user_id', 'token_hash', 'created_at', 'expires_at', 'mail_status', 'mail'],
@@ -229,6 +237,7 @@ final class Schema
                 ['key' => ['status' => 1, 'created_at' => 1], 'name' => 'push_queue_status_created'],
                 ['key' => ['status' => 1, 'next_attempt_at' => 1], 'name' => 'push_queue_retry_due'],
                 ['key' => ['status' => 1, 'started_at' => 1], 'name' => 'push_queue_stale_lease'],
+                ['key' => ['status' => 1, 'reminder_due_at' => 1], 'name' => 'push_queue_reminder_due'],
             ],
             Collections::PASSWORD_RESETS => [
                 ['key' => ['token_hash' => 1], 'name' => 'password_reset_token_unique', 'unique' => true],

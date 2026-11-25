@@ -167,6 +167,7 @@ final class MongoOccurrences
                 'failure_detail' => $communication['failure_detail'] ?? null,
                 'retried' => isset($communication['retried_at']),
                 'is_retry' => isset($communication['retry_of_id']),
+                'is_reminder' => isset($communication['reminder_of_id']),
             ];
         }
         return [

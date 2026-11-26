@@ -1,8 +1,13 @@
-<?php $pageTitle = 'Cadastro de funcionário'; ?>
-<section class="card">
-    <h1>Cadastro de funcionário</h1>
-    <p class="muted">Para consultar as contas já cadastradas, veja a <a class="text-link" href="/funcionarios">lista de funcionários</a>.</p>
-    <?php require __DIR__ . '/staff_form.php'; ?>
+<?php
+$pageTitle = 'Cadastros';
+$crumbs = [['Cadastros', null]];
+?>
+<section class="page-heading">
+    <div>
+        <span class="eyebrow">Secretaria</span>
+        <h1>Cadastros</h1>
+        <p>Turmas, alunos, responsáveis e funcionários. Escolha a aba, busque na lista ou use o botão verde para incluir.</p>
+    </div>
 </section>
 
 <?php require __DIR__ . '/school_directory.php'; ?>

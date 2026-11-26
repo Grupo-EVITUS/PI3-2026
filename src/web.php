@@ -60,6 +60,19 @@ function activeStaffId(array $profiles): ObjectId
     return $actor;
 }
 
+/** Aba de Cadastros correspondente à rota ou à entidade enviada, para voltar à mesma aba depois de salvar. */
+function directoryTab(string $path, array $post): string
+{
+    $entity = $path === '/cadastros/arquivar' && is_string($post['entity'] ?? null) ? $post['entity'] : '';
+    return match (true) {
+        $path === '/cadastros/turma', $entity === 'turma' => 'turmas',
+        $path === '/cadastros/aluno', $entity === 'aluno' => 'alunos',
+        str_starts_with($path, '/cadastros/responsavel'), $entity === 'responsavel' => 'responsaveis',
+        $path === '/cadastros/usuario' => 'funcionarios',
+        default => is_string($_GET['aba'] ?? null) ? $_GET['aba'] : 'alunos',
+    };
+}
+
 function renderSchoolDirectory(): void
 {
     $database = Mongo::database();
@@ -80,7 +93,8 @@ function renderSchoolDirectory(): void
     }
     $pushDevices = (new MongoPushSubscriptions($database))->activeCounts();
     $pushEnabled = WebPush::configuredPublicKey() !== null;
-    render('staff_registration.php', compact('classes', 'students', 'guardians', 'links', 'pushDevices', 'pushEnabled'));
+    $activeTab = directoryTab(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/', $_POST);
+    render('staff_registration.php', compact('classes', 'students', 'guardians', 'links', 'pushDevices', 'pushEnabled', 'activeTab'));
 }
 
 /** Dados do painel "ativar notificações" (null quando o servidor não tem chaves VAPID). */
@@ -272,6 +286,18 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
         'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
         'explanation' => is_string($explanation) ? $explanation : '',
     ]);
+    return;
+}
+if ($path === '/inicio') {
+    Auth::requireRole(['AOE', 'COORDENACAO', 'DIRETOR']);
+    if ($method !== 'GET') {
+        http_response_code(405);
+        header('Allow: GET');
+        return;
+    }
+    activeStaffId(['AOE', 'COORDENACAO', 'DIRETOR']);
+    header('Cache-Control: no-store');
+    render('home.php');
     return;
 }
 if ($path === '/ocorrencias' || preg_match('#^/ausencias/([a-f0-9]{24})$#', $path, $absenceMatch) === 1) {
@@ -526,7 +552,7 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
             }
             $directory->archive($actor, $entity, $targetId);
             flash('Cadastro arquivado.');
-            Auth::redirect('/cadastros');
+            Auth::redirect('/cadastros?aba=' . directoryTab($path, $_POST));
         }
         if ($path === '/cadastros/turma') {
             $year = filter_var($_POST['academic_year'] ?? null, FILTER_VALIDATE_INT);
@@ -568,7 +594,7 @@ if (in_array($path, ['/cadastros/turma', '/cadastros/aluno', '/cadastros/respons
             }
         }
         flash('Cadastro escolar salvo.');
-        Auth::redirect('/cadastros');
+        Auth::redirect('/cadastros?aba=' . directoryTab($path, $_POST));
     } catch (InvalidArgumentException $error) {
         http_response_code(422);
         flash($error->getMessage(), 'error');
@@ -598,7 +624,7 @@ try {
     }
     (new MongoStaffRegistration(Mongo::database()))->register(new ObjectId($_SESSION['user_id']), ...$fields);
     flash('Funcionário cadastrado.');
-    Auth::redirect('/cadastros');
+    Auth::redirect('/cadastros?aba=funcionarios');
 } catch (InvalidArgumentException $error) {
     http_response_code(422);
     flash($error->getMessage(), 'error');

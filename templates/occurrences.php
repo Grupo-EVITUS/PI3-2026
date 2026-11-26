@@ -1,47 +1,61 @@
 <?php
 $pageTitle = 'Ocorrências';
+$crumbs = [['Ocorrências', null]];
 $hasFilters = array_filter($filters, static fn(string $value): bool => $value !== '') !== [];
+$extraFilters = array_filter(
+    ['turma_id' => $filters['turma_id'], 'aluno_id' => $filters['aluno_id'], 'de' => $filters['de'], 'ate' => $filters['ate']],
+    static fn(string $value): bool => $value !== ''
+);
+// Os chips trocam só o status e mantêm turma, aluno e período já escolhidos.
+$statusUrl = static function (string $status) use ($extraFilters): string {
+    $query = $status === '' ? $extraFilters : ['status' => $status] + $extraFilters;
+    return '/ocorrencias' . ($query ? '?' . http_build_query($query) : '');
+};
+$statusChips = ['' => 'Todas', 'PENDENTE' => 'Pendentes', 'RESPONDIDA' => 'Respondidas'];
 ?>
 <section class="page-heading">
     <div>
         <span class="eyebrow">Acompanhamento</span>
         <h1>Ocorrências de ausência</h1>
-        <p>Consulte o andamento das comunicações e as justificativas enviadas.</p>
+        <p>Veja quem faltou, se o responsável foi avisado e se já justificou.</p>
     </div>
     <?php if (in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true)): ?>
         <a class="button button-primary" href="/chamada">Fazer chamada <span aria-hidden="true">+</span></a>
     <?php endif; ?>
 </section>
 
-<form class="card frequency-filters" method="get" action="/ocorrencias">
-    <label>Status
-        <select name="status">
-            <option value="">Todas</option>
-            <option value="PENDENTE" <?= $filters['status'] === 'PENDENTE' ? 'selected' : '' ?>>Pendentes</option>
-            <option value="RESPONDIDA" <?= $filters['status'] === 'RESPONDIDA' ? 'selected' : '' ?>>Respondidas</option>
-        </select>
-    </label>
-    <label>Turma
-        <select name="turma_id">
-            <option value="">Todas</option>
-            <?php foreach ($classes as $class): ?>
-                <option value="<?= e((string)$class['_id']) ?>" <?= $filters['turma_id'] === (string)$class['_id'] ? 'selected' : '' ?>><?= e($class['name']) ?> · <?= e($class['academic_year']) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label>Aluno
-        <select name="aluno_id">
-            <option value="">Todos</option>
-            <?php foreach ($students as $student): ?>
-                <option value="<?= e((string)$student['_id']) ?>" <?= $filters['aluno_id'] === (string)$student['_id'] ? 'selected' : '' ?>><?= e($student['name']) ?><?= isset($student['registration_no']) ? ' · ' . e($student['registration_no']) : '' ?></option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label>De <input type="date" name="de" value="<?= e($filters['de']) ?>"></label>
-    <label>Até <input type="date" name="ate" value="<?= e($filters['ate']) ?>"></label>
-    <button class="button button-primary" type="submit">Aplicar filtros</button>
-    <?php if ($hasFilters): ?><a class="button button-quiet" href="/ocorrencias">Limpar</a><?php endif; ?>
-</form>
+<nav class="chip-row" aria-label="Situação da ocorrência">
+    <?php foreach ($statusChips as $code => $label): ?>
+        <a class="chip" href="<?= e($statusUrl($code)) ?>"<?= $filters['status'] === $code ? ' aria-current="true"' : '' ?>><?= e($label) ?></a>
+    <?php endforeach; ?>
+</nav>
+
+<details class="card filters-card"<?= $extraFilters ? ' open' : '' ?>>
+    <summary>Filtrar por turma, aluno ou período<?= $extraFilters ? ' <span class="count">' . count($extraFilters) . '</span>' : '' ?></summary>
+    <form class="frequency-filters" method="get" action="/ocorrencias">
+        <?php if ($filters['status'] !== ''): ?><input type="hidden" name="status" value="<?= e($filters['status']) ?>"><?php endif; ?>
+        <label>Turma
+            <select name="turma_id">
+                <option value="">Todas</option>
+                <?php foreach ($classes as $class): ?>
+                    <option value="<?= e((string)$class['_id']) ?>" <?= $filters['turma_id'] === (string)$class['_id'] ? 'selected' : '' ?>><?= e($class['name']) ?> · <?= e($class['academic_year']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>Aluno
+            <select name="aluno_id">
+                <option value="">Todos</option>
+                <?php foreach ($students as $student): ?>
+                    <option value="<?= e((string)$student['_id']) ?>" <?= $filters['aluno_id'] === (string)$student['_id'] ? 'selected' : '' ?>><?= e($student['name']) ?><?= isset($student['registration_no']) ? ' · ' . e($student['registration_no']) : '' ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>De <input type="date" name="de" value="<?= e($filters['de']) ?>"></label>
+        <label>Até <input type="date" name="ate" value="<?= e($filters['ate']) ?>"></label>
+        <button class="button button-primary" type="submit">Aplicar filtros</button>
+        <?php if ($hasFilters): ?><a class="button button-quiet" href="/ocorrencias">Limpar</a><?php endif; ?>
+    </form>
+</details>
 
 <section class="card">
     <div class="section-toolbar">

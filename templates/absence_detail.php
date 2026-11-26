@@ -1,5 +1,6 @@
 <?php
 $pageTitle = 'Detalhes da ausência';
+$crumbs = [['Ocorrências', '/ocorrencias'], ['Detalhes', null]];
 $canRetry = in_array($_SESSION['profile'] ?? '', ['AOE', 'COORDENACAO'], true);
 $channelLabels = ['EMAIL' => 'E-mail', 'PUSH' => 'Notificação push'];
 ?>

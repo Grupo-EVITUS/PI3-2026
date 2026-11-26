@@ -36,7 +36,8 @@ def login(client, email):
 
 coord = browser()
 status, page = login(coord, os.environ["INITIAL_ADMIN_EMAIL"])
-assert status == 200 and 'action="/cadastros/usuario"' in page
+assert status == 200 and "Olá" in page and 'href="/cadastros?aba=alunos"' in page  # o login leva ao Início
+assert 'action="/cadastros/usuario"' in request(coord, "/cadastros?aba=funcionarios")[1]
 fields = dict(name="Equipe", email="aoe@example.org", profile="AOE", password=password)
 assert request(coord, "/cadastros/usuario", fields)[0] == 400
 status, result = request(coord, "/cadastros/usuario", dict(fields, csrf_token=csrf(page)))
@@ -50,7 +51,8 @@ status, result = request(coord, "/cadastros/usuario", dict(
 assert status == 200
 director = browser()
 status, frequency_home = login(director, "diretor@example.org")
-assert status == 200 and "Frequência escolar" in frequency_home
+assert status == 200 and "Olá" in frequency_home and 'href="/frequencia"' in frequency_home
+assert request(director, "/frequencia")[0] == 200 and "Frequência escolar" in request(director, "/frequencia")[1]
 assert request(director, "/chamada")[0] == 403
 assert request(aoe, "/frequencia")[0] == 403
 assert request(browser(), "/frequencia")[0] == 200  # Redirect para login.
@@ -219,6 +221,7 @@ for name, registration in [("Padrão A", "PD-001"), ("Padrão B", "PD-002")]:
     assert status == 200 and name in result
 status, page = request(aoe, "/chamada?turma_id=" + default_class)
 assert status == 200 and "Marque somente quem faltou" in page and 'type="radio"' not in page
+assert ('href="/chamada?turma_id=%s"' % default_class) in page and 'class="steps"' in page and "data-absent-count" in page
 assert page.count('type="checkbox" name="attendance[') == 2 and " checked" not in page
 default_ids = re.findall(r'type="hidden" name="attendance\[([a-f0-9]{24})\]" value="PRESENTE"', page)
 assert len(default_ids) == 2
@@ -238,6 +241,49 @@ assert status == 200 and "2 presente(s) e" in result and "0 ausente(s)" in resul
 status, result = request(aoe, "/chamada", attendance_form("2026-11-17", absent=[default_ids[0]]))
 assert status == 200 and "1 presente(s) e" in result and "1 ausente(s)" in result
 assert "Sem responsável ativo para: Padrão A." in result
+assert "Ocorrências desta data" in result and "/ocorrencias?de=2026-11-17&amp;ate=2026-11-17" in result
 status, result = request(aoe, "/chamada", attendance_form("2026-11-18", include=[default_ids[0]], absent=[default_ids[0]]))
 assert status == 422 and "todos os alunos ativos" in result  # a chamada continua exigindo a turma inteira
 assert re.search(r'value="AUSENTE"\s+checked', result)  # a marcação é mantida após o erro
+
+
+# Início e navegação: atalhos por perfil, área atual destacada, caminho de navegação e abas de Cadastros.
+status, home = request(coord, "/inicio")
+assert status == 200 and "Olá" in home and 'aria-current="page"' in home
+for link in ['href="/chamada"', 'href="/ocorrencias?status=PENDENTE"', 'href="/ocorrencias"', 'href="/frequencia"',
+             'href="/cadastros?aba=turmas"', 'href="/cadastros?aba=alunos"', 'href="/cadastros?aba=responsaveis"',
+             'href="/funcionarios"']:
+    assert link in home, link
+status, aoe_home = request(aoe, "/inicio")
+assert status == 200 and 'href="/chamada"' in aoe_home and 'href="/ocorrencias?status=PENDENTE"' in aoe_home
+for hidden_link in ['href="/cadastros', 'href="/frequencia"', 'href="/funcionarios"']:
+    assert hidden_link not in aoe_home, hidden_link
+status, director_home = request(director, "/inicio")
+assert status == 200 and 'href="/frequencia"' in director_home and 'href="/ocorrencias?status=PENDENTE"' in director_home
+assert 'href="/chamada"' not in director_home and 'href="/cadastros' not in director_home
+assert request(browser(), "/inicio")[0] == 200  # Redirect para login.
+assert request(coord, "/inicio", {"csrf_token": csrf(home)})[0] == 405
+status, root = request(coord, "/")
+assert status == 200 and "Olá" in root  # a raiz leva ao Início
+assert re.search(r'href="/ocorrencias" aria-current="page"', occurrences) and 'class="breadcrumb"' in occurrences
+assert 'class="breadcrumb"' in detail and 'filters-card" open' not in occurrences
+assert 'href="/ocorrencias?status=PENDENTE"' in occurrences
+assert "status=RESPONDIDA&amp;turma_id=" + attendance_class in filtered and 'filters-card" open' in filtered
+
+
+def panel_tag(html, name):
+    return re.search(r'<section[^>]*id="aba-%s"[^>]*>' % name, html)[0]
+
+
+status, tab_page = request(coord, "/cadastros?aba=responsaveis")
+assert status == 200 and " hidden" not in panel_tag(tab_page, "responsaveis") and " hidden" in panel_tag(tab_page, "alunos")
+assert re.search(r'id="tab-responsaveis"[^>]*aria-selected="true"', tab_page)
+status, tab_page = request(coord, "/cadastros?aba=invalida")  # valor inválido cai na aba padrão
+assert status == 200 and " hidden" not in panel_tag(tab_page, "alunos") and " hidden" in panel_tag(tab_page, "turmas")
+status, tab_page = request(coord, "/cadastros?aba[]=x")
+assert status == 200 and " hidden" not in panel_tag(tab_page, "alunos")
+# Depois de salvar (ou errar), a aba do cadastro continua aberta, e o formulário volta aberto no erro.
+status, result = request(coord, "/cadastros/aluno", dict(base_student, birth_date="2999-01-01"))
+assert status == 422 and " hidden" not in panel_tag(result, "alunos") and '<details class="new-item" open>' in result
+status, result = request(coord, "/cadastros/responsavel", dict(base_guardian, phone="abc"))
+assert status == 422 and " hidden" not in panel_tag(result, "responsaveis") and " hidden" in panel_tag(result, "alunos")

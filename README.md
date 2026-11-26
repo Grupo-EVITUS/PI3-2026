@@ -64,6 +64,29 @@ Acesse <http://127.0.0.1:8000>. Em produção, execute os workers como serviços
 - **Diretor:** somente leitura: frequência (`/frequencia`) e ocorrências (`/ocorrencias`).
 - **Responsável:** sem conta. Responde por link individual de alta entropia (`/justificar/{token}`), recebido por e-mail ou como notificação push no Android.
 
+### Navegação: qualquer tarefa em até 3 cliques
+
+Depois do login, a equipe cai no **Início** (`/inicio`): um painel de atalhos do seu perfil. O menu do topo fica sempre visível, marca a área atual e vira um botão **Menu** no celular. Páginas internas mostram o caminho (`Início › Ocorrências › Detalhes`). Contando a partir do Início:
+
+| Tarefa | Caminho | Cliques |
+| --- | --- | --- |
+| Fazer a chamada de uma turma | Início → Fazer chamada → turma → marcar ausentes → Concluir | 3 + marcações |
+| Ver faltas sem justificativa | Início → Ocorrências pendentes | 1 |
+| Filtrar ocorrências por turma, aluno ou período | Ocorrências → Filtrar → Aplicar | 3 |
+| Reenviar um e-mail que falhou | Ocorrências → Ver detalhes → Reenviar | 3 |
+| Consultar a frequência | Início → Frequência | 1 |
+| Cadastrar um aluno | Cadastros → aba Alunos → Novo aluno → Cadastrar | 3 + envio |
+| Corrigir um cadastro | Cadastros → aba → Editar → Salvar | 3 + envio |
+| Buscar uma conta de funcionário | Funcionários (menu) → buscar | 1 |
+| Criar um funcionário | Cadastros → aba Funcionários → Criar | 2 + envio |
+
+Detalhes de uso:
+
+- **Cadastros** tem quatro abas (Turmas, Alunos, Responsáveis, Funcionários). Cada lista tem busca instantânea (sem diferenciar acentos nem maiúsculas), botão **Novo** que abre o formulário no lugar e **Editar** dentro da própria linha. Depois de salvar, a mesma aba continua aberta. O endereço `/cadastros?aba=alunos` abre direto na aba.
+- **Chamada:** as turmas são botões; a busca de aluno aparece em turmas maiores; um contador mostra quantos ausentes foram marcados e a barra com **Concluir** fica sempre visível. Depois de enviar, o botão é bloqueado para evitar chamada em duplicidade.
+- **Ocorrências:** chips de situação (Todas, Pendentes, Respondidas) que mantêm os filtros escolhidos; os filtros de turma, aluno e período ficam recolhidos e abrem sozinhos quando há filtro ativo.
+- Os recursos de JavaScript (abas, busca, contador, trava de envio duplo) só melhoram o uso: sem JavaScript, as páginas continuam funcionando, com as abas como links.
+
 ### Chamada
 
 Na tela, **todos os alunos começam como presentes** e a AOE marca apenas os **ausentes**, o que poupa trabalho em turmas grandes. O envio continua levando a situação de **todos** os alunos ativos da turma na data. O serviço grava, em uma transação, a chamada (`attendance_sessions`), as ausências, a auditoria, as comunicações e os avisos na fila; rejeita chamada repetida para a mesma turma e data. O envio acontece depois, pelos workers, e não na requisição. Como a presença é o padrão, quem não for marcado como ausente **não gera aviso** ao responsável, e a chamada não pode ser refeita para a mesma turma e data: confira as marcações antes de concluir.

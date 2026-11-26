@@ -1,5 +1,6 @@
 <?php
 $pageTitle = 'Funcionários';
+$crumbs = [['Funcionários', null]];
 $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' => 'Diretor'];
 $hasFilters = array_filter($filters, static fn(string $value): bool => $value !== '') !== [];
 ?>
@@ -9,7 +10,7 @@ $hasFilters = array_filter($filters, static fn(string $value): bool => $value !=
         <h1>Funcionários</h1>
         <p>Consulte as contas de acesso ao sistema. Para criar uma conta, use o cadastro de funcionário.</p>
     </div>
-    <a class="button button-primary" href="/cadastros">Cadastrar funcionário <span aria-hidden="true">+</span></a>
+    <a class="button button-primary" href="/cadastros?aba=funcionarios">Cadastrar funcionário <span aria-hidden="true">+</span></a>
 </section>
 
 <form class="card frequency-filters" method="get" action="/funcionarios">

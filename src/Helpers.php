@@ -16,13 +16,10 @@ function formatPhone(?string $digits): string
     return '(' . substr($digits, 0, 2) . ') ' . substr($digits, 2, $split - 2) . '-' . substr($digits, $split);
 }
 
+/** Página inicial da equipe: um painel com os atalhos do perfil. */
 function staffHomePath(): string
 {
-    return match ($_SESSION['profile'] ?? '') {
-        'DIRETOR' => '/frequencia',
-        'AOE' => '/chamada',
-        default => '/cadastros',
-    };
+    return '/inicio';
 }
 
 function render(string $template, array $data = []): void

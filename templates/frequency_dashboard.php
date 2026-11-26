@@ -1,11 +1,12 @@
 <?php
 $pageTitle = 'Frequência escolar';
+$crumbs = [['Frequência', null]];
 $showRate = static fn(?float $rate): string => $rate === null ? 'Sem dados' : number_format($rate, 1, ',', '.') . '%';
 $bandLabel = ['green' => 'Verde', 'yellow' => 'Amarelo', 'red' => 'Vermelho', 'no_data' => 'Sem dados'];
 ?>
 <section class="page-heading">
     <div>
-        <span class="eyebrow">Homologação MongoDB</span>
+        <span class="eyebrow">Acompanhamento</span>
         <h1>Frequência escolar</h1>
         <p>Somente chamadas completas e concluídas entram no cálculo.</p>
     </div>

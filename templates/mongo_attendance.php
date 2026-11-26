@@ -75,7 +75,7 @@ $absentMarked = count(array_filter($selectedAttendance, static fn($status): bool
                             <span class="student-name"><strong><?= e($student['name']) ?></strong><small><?= e($student['registration_no'] ?? 'Sem matrícula informada') ?></small></span>
                             <?php /* Quem não for marcado como ausente segue como presente: o campo oculto vem antes e a caixa, se marcada, vence (mesmo nome, vale o último valor). */ ?>
                             <input type="hidden" name="attendance[<?= e($studentKey) ?>]" value="PRESENTE">
-                            <label><input type="checkbox" name="attendance[<?= e($studentKey) ?>]" value="AUSENTE" aria-label="Ausente: <?= e($student['name']) ?>"
+                            <label><input type="checkbox" name="attendance[<?= e($studentKey) ?>]" aria-label="Ausente: <?= e($student['name']) ?>" value="AUSENTE"
                                 <?= ($selectedAttendance[$studentKey] ?? null) === 'AUSENTE' ? 'checked' : '' ?>> Ausente</label>
                         </div>
                     <?php endforeach; ?>

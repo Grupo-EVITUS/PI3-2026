@@ -39,7 +39,7 @@ $csrf = Auth::csrfToken();
         <div class="new-item-body">
             <form method="post" action="/cadastros/turma" class="stack-form form-columns">
                 <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                <label>Nome <input name="name" maxlength="120" required placeholder="Ex.: 5º ano A"></label>
+                <label>Nome <input name="name" maxlength="120" required placeholder="Ex.: Turma 101"></label>
                 <label>Série <input name="grade" maxlength="80" required placeholder="Ex.: 5º ano"></label>
                 <label>Ano letivo <input name="academic_year" type="number" min="2000" max="2100" value="<?= e(date('Y')) ?>" required></label>
                 <label>Turno <select name="shift" required><option>Manhã</option><option>Tarde</option><option>Noite</option><option>Integral</option></select></label>

@@ -19,6 +19,8 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 Por padrão, o e-mail fica na caixa local do [Mailpit](http://127.0.0.1:8025). Para entregar numa caixa real, configure `SAA_SMTP_HOST`, `SAA_SMTP_PORT`, `SAA_SMTP_ENCRYPTION`, `SAA_SMTP_USERNAME`, `SAA_SMTP_PASSWORD` e `SAA_MAIL_FROM` no ambiente do Compose e execute o comando de subida novamente. Use como remetente um endereço autorizado pelo provedor. As mensagens do ambiente local têm links para `127.0.0.1`, acessíveis na máquina que roda o projeto.
 
+O Compose gera as chaves do push na primeira subida e as guarda em um volume do Docker. Se o volume for removido ou se o aparelho foi inscrito com as antigas chaves de teste, ative as notificações novamente no navegador.
+
 ### Execução sem Docker
 
 - PHP 8.1 ou superior com as extensões `mongodb` (2.5), `mbstring` e `openssl`
@@ -183,7 +185,7 @@ php tests/Integration/Database/MongoAttendanceTest.php
 php tests/Unit/Push/WebPushTest.php
 ```
 
-A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.github/workflows/saa-mongodb-foundation.yml`. Para subir apenas o Mongo local: `docker compose -f docker-compose.saa-mongodb.yml up -d --wait mongodb` (somente desenvolvimento, sem autenticação). Relatórios de testes manuais da equipe ficam em `DOC/Relatorios-de-Testes/`.
+A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.github/workflows/saa-mongodb-foundation.yml`. Para subir apenas o Mongo local: `docker compose -f docker-compose.saa-mongodb.yml up -d --wait mongodb` (somente desenvolvimento, sem autenticação).
 
 ## Estrutura
 
@@ -199,4 +201,4 @@ A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.g
 
 WhatsApp/SMS, aplicativo nativo de loja e importação em lote de planilhas. O SQLite foi removido: o histórico do Git guarda a implementação anterior.
 
-> O arquivo `saa_flask_mongodb_dashboard_atualizado.zip` e os diagramas são materiais anteriores do repositório.
+> Os diagramas são materiais anteriores do repositório.

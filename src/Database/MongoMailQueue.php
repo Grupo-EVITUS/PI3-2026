@@ -12,7 +12,11 @@ use RuntimeException;
 use Throwable;
 use function MongoDB\with_transaction;
 
-/** Reivindica jobs da fila Mongo. SMTP ocorre fora da transação: entrega ao menos uma vez. */
+/**
+ * Reivindica jobs da fila Mongo. SMTP ocorre fora da transação: entrega ao menos uma vez.
+ * O aviso de uma falta desfeita não sai mais: é cancelado em vez de enviado ou reagendado.
+ * Jobs CANCELADO nunca são reivindicados; a correção da falta desfeita é um e-mail comum.
+ */
 final class MongoMailQueue
 {
     public function __construct(private readonly Database $database)
@@ -44,19 +48,29 @@ final class MongoMailQueue
             if ($job === null) {
                 break;
             }
-            $success = true;
-            try {
-                $send(['recipient' => $job['recipient'], 'subject' => $job['subject'], 'body' => $job['body']]);
-            } catch (Throwable) {
-                $success = false;
+            // Reivindicado de novo (nova tentativa ou reserva expirada) depois de a falta ser desfeita.
+            $withdrawn = MongoAbsenceCancellation::noticeWithdrawn($this->database, $job['communication_id']);
+            $success = false;
+            if (!$withdrawn) {
+                $success = true;
+                try {
+                    $send(['recipient' => $job['recipient'], 'subject' => $job['subject'], 'body' => $job['body']]);
+                } catch (Throwable) {
+                    $success = false;
+                }
             }
             $session = $this->database->getManager()->startSession();
             try {
-                with_transaction($session, function (Session $session) use ($job, $claimId, $success): void {
+                with_transaction($session, function (Session $session) use ($job, $claimId, $success, $withdrawn): void {
                     $now = new UTCDateTime();
-                    $terminal = !$success && (int)$job['attempts'] >= 3;
-                    $queueStatus = $success ? 'CONCLUIDO' : ($terminal ? 'FALHA' : 'AGUARDANDO');
-                    $nextAttempt = !$success && !$terminal
+                    // Falha com a falta desfeita durante o envio: nada chegou, então cancela em vez de tentar de novo.
+                    $cancelled = !$success && ($withdrawn || MongoAbsenceCancellation::noticeWithdrawn(
+                        $this->database, $job['communication_id'], $session
+                    ));
+                    $terminal = !$success && !$cancelled && (int)$job['attempts'] >= 3;
+                    $queueStatus = $success ? 'CONCLUIDO'
+                        : ($cancelled ? 'CANCELADO' : ($terminal ? 'FALHA' : 'AGUARDANDO'));
+                    $nextAttempt = $queueStatus === 'AGUARDANDO'
                         ? new UTCDateTime((time() + 60 * (2 ** ((int)$job['attempts'] - 1))) * 1000)
                         : null;
                     $queueFields = ['status' => $queueStatus, 'started_at' => null,
@@ -74,17 +88,20 @@ final class MongoMailQueue
                     }
                     $communication = $this->database->communications->updateOne(
                         ['_id' => $job['communication_id'], 'status' => 'PENDENTE'],
-                        ['$set' => ['status' => $success ? 'ENVIADO' : ($terminal ? 'FALHA' : 'PENDENTE'),
-                            'sent_at' => $success ? $now : null,
-                            'failure_detail' => $success ? null : 'Falha na entrega SMTP.']],
+                        ['$set' => $cancelled
+                            ? ['status' => 'CANCELADA', 'cancelled_at' => $now, 'failure_detail' => null]
+                            : ['status' => $success ? 'ENVIADO' : ($terminal ? 'FALHA' : 'PENDENTE'),
+                                'sent_at' => $success ? $now : null,
+                                'failure_detail' => $success ? null : 'Falha na entrega SMTP.']],
                         ['session' => $session]
                     );
                     if ($communication->getMatchedCount() !== 1) {
                         throw new RuntimeException('Comunicação da fila ausente ou já processada.');
                     }
                     (new MongoOperationLogWriter($this->database->operation_logs))->append(
-                        null, $success ? 'EMAIL_ENVIADO' : ($terminal ? 'EMAIL_FALHA' : 'EMAIL_RETRY_AGENDADO'), 'comunicacao',
-                        $job['communication_id'], '', $session
+                        null, ['CONCLUIDO' => 'EMAIL_ENVIADO', 'CANCELADO' => 'EMAIL_CANCELADO', 'FALHA' => 'EMAIL_FALHA',
+                            'AGUARDANDO' => 'EMAIL_RETRY_AGENDADO'][$queueStatus], 'comunicacao',
+                        $job['communication_id'], $cancelled ? 'Falta desfeita pela escola; aviso não enviado.' : '', $session
                     );
                 });
             } finally {

@@ -68,6 +68,15 @@ tbody tr:last-child td { border-bottom: 0; }
 .status-pendente { color: var(--amber); background: var(--amber-bg); }
 .status-respondida, .status-enviado { color: var(--green); background: var(--green-bg); }
 .status-falha { color: var(--red); background: var(--red-bg); }
+.status-cancelada { color: #56676a; background: #edf1f0; }
+/* Cartões de consulta ou clicáveis sobem ao passar o mouse (e ao receber foco pelo teclado).
+   Não use em cartões de formulário: o cartão subiria enquanto a pessoa digita. */
+.card-lift { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.card-lift:hover, .card-lift:focus-visible, .card-lift:focus-within { transform: translateY(-4px); border-color: #b6d2cc; box-shadow: 0 22px 48px rgba(32, 70, 71, .14); }
+@media (prefers-reduced-motion: reduce) {
+    .card-lift { transition: box-shadow .18s ease, border-color .18s ease; }
+    .card-lift:hover, .card-lift:focus-visible, .card-lift:focus-within { transform: none; }
+}
 .inline-warning { display: inline-block; margin-left: 4px; color: var(--red); font-size: 10px; }
 .subline, .result-row small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .muted, .legend-note { color: var(--muted); }

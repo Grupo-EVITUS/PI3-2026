@@ -1,0 +1,51 @@
+/* Ocorrências, detalhe da ausência e resumo da chamada (desfazer falta). */
+
+/* Resumo da chamada (/chamada/{id}) */
+.summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.summary-stat { display: grid; gap: 4px; padding: 18px 20px; }
+.summary-stat span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.summary-stat strong { font-size: 28px; line-height: 1.1; letter-spacing: -.03em; }
+.summary-stat-present strong { color: var(--green); }
+.summary-stat-absent strong { color: var(--amber); }
+.summary-stat-undone strong { color: #56676a; }
+.summary-section .section-toolbar { margin-bottom: 14px; }
+.absence-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 14px; }
+.absence-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 18px; }
+.absence-card-undone { background: #f8faf9; }
+.absence-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.absence-card-head > div { min-width: 0; }
+.absence-card-head strong, .absence-card-head small { display: block; overflow-wrap: anywhere; }
+.absence-card-head strong { font-size: 14px; }
+.absence-card-head small { margin-top: 2px; color: var(--muted); font-size: 11px; }
+.absence-card-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid #edf2f1; }
+.guardian-notices { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.guardian-notices li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border-radius: 9px; background: #f7faf9; }
+.guardian-notices li > span:first-child { min-width: 0; }
+.guardian-notices strong, .guardian-notices small { display: block; overflow-wrap: anywhere; }
+.guardian-notices strong { color: var(--ink); font-size: 12px; }
+.guardian-notices small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.guardian-notices-empty { margin: 0; font-size: 12px; }
+.undo-note { margin: 0; padding: 10px 12px; border-radius: 9px; background: #edf1f0; color: #405c61; font-size: 12px; overflow-wrap: anywhere; }
+
+/* Confirmação (/ausencias/{id}/desfazer) */
+.undo-card { max-width: 720px; }
+.undo-card .undo-title { margin-top: 24px; }
+.undo-effects { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 20px; color: #405c61; font-size: 13px; }
+.undo-form { display: flex; flex-direction: column; margin-top: 24px; }
+.undo-form .form-hint { margin-top: 0; }
+.undo-form .form-actions { gap: 10px; }
+
+/* Detalhe da ausência (/ausencias/{id}) */
+.detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.undo-banner strong { margin-right: 4px; }
+.undo-banner-note { display: block; margin-top: 4px; font-size: 12px; }
+
+/* Página do responsável: aviso cancelado */
+.public-cancelled { margin: 18px 0 0; }
+
+@media (max-width: 600px) {
+    .detail-actions { width: 100%; }
+    .detail-actions .button { flex: 1 1 auto; }
+    .absence-card-actions .button { width: 100%; }
+    .undo-form .form-actions { flex-direction: column-reverse; }
+}

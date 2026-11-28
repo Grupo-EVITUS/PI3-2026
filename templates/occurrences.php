@@ -1,6 +1,7 @@
 <?php
 $pageTitle = 'Ocorrências';
 $hasFilters = array_filter($filters, static fn(string $value): bool => $value !== '') !== [];
+$statusLabels = ['PENDENTE' => 'Pendente', 'RESPONDIDA' => 'Respondida', 'CANCELADA' => 'Desfeita'];
 ?>
 <section class="page-heading">
     <div>
@@ -19,6 +20,7 @@ $hasFilters = array_filter($filters, static fn(string $value): bool => $value !=
             <option value="">Todas</option>
             <option value="PENDENTE" <?= $filters['status'] === 'PENDENTE' ? 'selected' : '' ?>>Pendentes</option>
             <option value="RESPONDIDA" <?= $filters['status'] === 'RESPONDIDA' ? 'selected' : '' ?>>Respondidas</option>
+            <option value="CANCELADA" <?= $filters['status'] === 'CANCELADA' ? 'selected' : '' ?>>Desfeitas</option>
         </select>
     </label>
     <label>Turma
@@ -60,15 +62,17 @@ $hasFilters = array_filter($filters, static fn(string $value): bool => $value !=
                         <td data-label="Aluno"><strong><?= e($row['student_name']) ?></strong></td>
                         <td data-label="Turma"><?= e($row['class_name']) ?></td>
                         <td data-label="Data"><?= e(date('d/m/Y', strtotime($row['absence_date']))) ?></td>
-                        <td data-label="Status"><span class="status status-<?= e(strtolower($row['status'])) ?>"><?= e(ucfirst(strtolower($row['status']))) ?></span></td>
+                        <td data-label="Status"><span class="status status-<?= e(strtolower($row['status'])) ?>"><?= e($statusLabels[$row['status']] ?? $row['status']) ?></span></td>
                         <td data-label="Comunicações">
                             <?= (int)$row['communication_count'] ?>
                             <?php if ((int)$row['failed_count']): ?><span class="inline-warning"><?= (int)$row['failed_count'] ?> falha(s)</span><?php endif; ?>
+                            <?php if ((int)$row['correction_count']): ?><small class="subline"><?= (int)$row['correction_count'] ?> e-mail(s) de correção</small><?php endif; ?>
                         </td>
                         <td data-label="Justificativa">
                             <?php if ($row['reason']): ?>
                                 <?= e($reasons[$row['reason']] ?? $row['reason']) ?>
                                 <?php if ($row['reason'] === 'OUTRO' && $row['explanation']): ?><small class="subline"><?= e($row['explanation']) ?></small><?php endif; ?>
+                            <?php elseif ($row['status'] === 'CANCELADA'): ?><span class="muted">Não é necessária</span>
                             <?php else: ?><span class="muted">Aguardando</span><?php endif; ?>
                         </td>
                         <td data-label="Detalhes"><a class="text-link" href="/ausencias/<?= e($row['id']) ?>">Ver detalhes <span aria-hidden="true">→</span></a></td>

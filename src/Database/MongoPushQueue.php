@@ -18,6 +18,7 @@ use function MongoDB\with_transaction;
  * Entrega ao menos uma vez; a tag da notificação (ID da comunicação) agrupa duplicatas no aparelho.
  * O 2xx do serviço de push indica aceite, não leitura: se a ausência seguir sem justificativa
  * depois de $reminderHours horas, o responsável recebe também um lembrete por e-mail.
+ * Falta desfeita pela escola: o aviso não sai mais (nem pelo e-mail de reserva) e não há lembrete.
  */
 final class MongoPushQueue
 {
@@ -76,11 +77,13 @@ final class MongoPushQueue
             if ($job === null) {
                 break;
             }
-            $outcome = $this->deliver($job, $send);
+            // Reivindicado de novo (nova tentativa ou reserva expirada) depois de a falta ser desfeita.
+            $withdrawn = MongoAbsenceCancellation::noticeWithdrawn($this->database, $job['communication_id']);
+            $outcome = $withdrawn ? self::noDelivery() : $this->deliver($job, $send);
             $session = $this->database->getManager()->startSession();
             try {
-                with_transaction($session, function (Session $session) use ($job, $claimId, $outcome): void {
-                    $this->settle($job, $claimId, $outcome, $session);
+                with_transaction($session, function (Session $session) use ($job, $claimId, $outcome, $withdrawn): void {
+                    $this->settle($job, $claimId, $outcome, $withdrawn, $session);
                 });
             } finally {
                 $session->endSession();
@@ -93,7 +96,7 @@ final class MongoPushQueue
     /**
      * Lembrete por e-mail dos pushes entregues cujo prazo venceu sem justificativa.
      * Cria nova comunicação por e-mail (novo link) ligada à do push por reminder_of_id;
-     * ausência já respondida, responsável arquivado ou sem dados para o link dispensam o lembrete.
+     * ausência desfeita ou já respondida, responsável arquivado ou sem dados para o link dispensam o lembrete.
      */
     public function remindUnanswered(int $limit = 20): int
     {
@@ -143,6 +146,7 @@ final class MongoPushQueue
 
         $reason = match (true) {
             $absence === null || $student === null => 'Ausência não encontrada.',
+            $absence['status'] === 'CANCELADA' => 'Ausência desfeita pela escola.',
             $absence['status'] !== 'PENDENTE' => 'Ausência já respondida.',
             $guardian === null => 'Responsável arquivado.',
             !filter_var($guardian['email'], FILTER_VALIDATE_EMAIL) => 'E-mail do responsável inválido.',
@@ -194,9 +198,15 @@ final class MongoPushQueue
     }
 
     /** @return array{delivered: list<ObjectId>, gone: list<ObjectId>, transient: int, permanent: int, detail: string} */
+    private static function noDelivery(): array
+    {
+        return ['delivered' => [], 'gone' => [], 'transient' => 0, 'permanent' => 0, 'detail' => ''];
+    }
+
+    /** @return array{delivered: list<ObjectId>, gone: list<ObjectId>, transient: int, permanent: int, detail: string} */
     private function deliver(array $job, callable $send): array
     {
-        $outcome = ['delivered' => [], 'gone' => [], 'transient' => 0, 'permanent' => 0, 'detail' => ''];
+        $outcome = self::noDelivery();
         $subscriptions = $this->database->push_subscriptions->find(
             ['guardian_id' => $job['guardian_id'], 'active' => true],
             ['sort' => ['created_at' => -1], 'limit' => MongoPushSubscriptions::MAX_ACTIVE_PER_GUARDIAN]
@@ -232,14 +242,18 @@ final class MongoPushQueue
         return $outcome;
     }
 
-    private function settle(array $job, ObjectId $claimId, array $outcome, Session $session): void
+    private function settle(array $job, ObjectId $claimId, array $outcome, bool $withdrawn, Session $session): void
     {
         $options = ['session' => $session];
         $now = new UTCDateTime();
         $attempts = (int)$job['attempts'];
         $delivered = $outcome['delivered'] !== [];
-        $retry = !$delivered && $outcome['transient'] > 0 && $attempts < self::MAX_ATTEMPTS;
-        $status = $delivered ? 'CONCLUIDO' : ($retry ? 'AGUARDANDO' : 'ENCAMINHADO_EMAIL');
+        // A falta pode ter sido desfeita durante a entrega: nada de nova tentativa, e-mail de reserva ou lembrete.
+        $withdrawn = $withdrawn
+            || MongoAbsenceCancellation::noticeWithdrawn($this->database, $job['communication_id'], $session);
+        $cancelled = !$delivered && $withdrawn;
+        $retry = !$delivered && !$cancelled && $outcome['transient'] > 0 && $attempts < self::MAX_ATTEMPTS;
+        $status = $delivered ? 'CONCLUIDO' : ($cancelled ? 'CANCELADO' : ($retry ? 'AGUARDANDO' : 'ENCAMINHADO_EMAIL'));
         $fallback = $job['fallback_email'] ?? null;
         if ($status === 'ENCAMINHADO_EMAIL' && $fallback === null) {
             throw new RuntimeException('Aviso sem e-mail de reserva; a fila de push foi preservada.');
@@ -248,11 +262,15 @@ final class MongoPushQueue
         $fields = ['status' => $status, 'started_at' => null,
             'next_attempt_at' => $retry ? new UTCDateTime((time() + 60 * (2 ** ($attempts - 1))) * 1000) : null,
             'processed_at' => $retry ? null : $now,
-            'failure_detail' => $delivered ? null : ($outcome['detail'] !== '' ? $outcome['detail'] : 'Nenhum aparelho ativo.')];
+            'failure_detail' => match (true) {
+                $delivered => null,
+                $cancelled => 'Falta desfeita pela escola; aviso não enviado.',
+                default => $outcome['detail'] !== '' ? $outcome['detail'] : 'Nenhum aparelho ativo.',
+            }];
         if (!$retry) {
             // Conteúdo com link de justificativa não fica na fila após o desfecho.
             $fields += ['body' => '', 'url' => '', 'fallback_email' => null];
-            $remind = $delivered && $this->reminderHours > 0;
+            $remind = $delivered && $this->reminderHours > 0 && !$withdrawn;
             $fields['reminder_due_at'] = $remind ? new UTCDateTime((time() + 3600 * $this->reminderHours) * 1000) : null;
             if (!$remind) {
                 $fields['base_url'] = null;
@@ -282,6 +300,8 @@ final class MongoPushQueue
         $communication = ['_id' => $job['communication_id'], 'status' => 'PENDENTE'];
         if ($status === 'CONCLUIDO') {
             $update = ['status' => 'ENVIADO', 'sent_at' => $now, 'failure_detail' => null];
+        } elseif ($status === 'CANCELADO') {
+            $update = ['status' => 'CANCELADA', 'cancelled_at' => $now, 'failure_detail' => null];
         } elseif ($status === 'ENCAMINHADO_EMAIL') {
             $update = ['channel' => 'EMAIL', 'failure_detail' => 'Push não entregue; aviso encaminhado por e-mail.'];
             $this->database->mail_queue->insertOne([
@@ -299,9 +319,10 @@ final class MongoPushQueue
         (new MongoOperationLogWriter($this->database->operation_logs))->append(
             null,
             ['CONCLUIDO' => 'PUSH_ENVIADO', 'AGUARDANDO' => 'PUSH_RETRY_AGENDADO',
-                'ENCAMINHADO_EMAIL' => 'PUSH_ENCAMINHADO_EMAIL'][$status],
+                'ENCAMINHADO_EMAIL' => 'PUSH_ENCAMINHADO_EMAIL', 'CANCELADO' => 'PUSH_CANCELADO'][$status],
             'comunicacao', $job['communication_id'],
-            count($outcome['delivered']) . ' aparelho(s) entregue(s); ' . count($outcome['gone']) . ' desativado(s)',
+            ($cancelled ? 'Falta desfeita pela escola; aviso não enviado. ' : '')
+                . count($outcome['delivered']) . ' aparelho(s) entregue(s); ' . count($outcome['gone']) . ' desativado(s)',
             $session
         );
     }

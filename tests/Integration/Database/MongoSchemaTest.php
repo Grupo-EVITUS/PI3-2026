@@ -146,6 +146,37 @@ try {
     check($db->mail_queue->findOne(['communication_id' => $communicationId])['status'] === 'QUARENTENA',
         'Fila deixou de estar em quarentena.');
 
+    // Falta desfeita: campos novos aceitos (o motivo conta caracteres, não bytes) e valores fora do contrato recusados.
+    $db->absences->updateOne(['_id' => $absenceId], ['$set' => ['status' => 'CANCELADA', 'cancelled_at' => $now,
+        'cancelled_by' => $userId, 'cancel_reason' => str_repeat('é', 300)]]);
+    rejected(fn() => $db->absences->updateOne(['_id' => $absenceId], ['$set' => ['cancel_reason' => str_repeat('a', 301)]]), 121);
+    rejected(fn() => $db->absences->updateOne(['_id' => $absenceId], ['$set' => ['cancelled_by' => 'coordenação']]), 121);
+    rejected(fn() => $db->absences->updateOne(['_id' => $absenceId], ['$set' => ['status' => 'DESFEITA']]), 121);
+    $db->attendance_sessions->updateOne(['_id' => $sessionId], ['$push' => ['corrections' => [
+        'student_id' => $studentId, 'absence_id' => $absenceId, 'from' => 'AUSENTE', 'to' => 'PRESENTE',
+        'by' => $userId, 'at' => $now, 'reason' => 'Falta marcada por engano.',
+    ]]]);
+    rejected(fn() => $db->attendance_sessions->updateOne(['_id' => $sessionId], ['$push' => ['corrections' => [
+        'student_id' => $studentId, 'absence_id' => $absenceId, 'from' => 'PRESENTE', 'to' => 'AUSENTE',
+        'by' => $userId, 'at' => $now, 'reason' => '',
+    ]]]), 121);
+    rejected(fn() => $db->attendance_sessions->updateOne(['_id' => $sessionId], ['$push' => ['corrections' => [
+        'student_id' => $studentId, 'absence_id' => $absenceId, 'from' => 'AUSENTE', 'to' => 'PRESENTE', 'reason' => '',
+    ]]]), 121);
+    $db->communications->updateOne(['_id' => $communicationId], ['$set' => ['status' => 'CANCELADA', 'cancelled_at' => $now]]);
+    $correctionNotice = ['_id' => new ObjectId(), 'token_hash' => 'hash-correction', 'status' => 'PENDENTE',
+        'channel' => 'EMAIL', 'kind' => 'CORRECAO', 'correction_of_id' => $communicationId] + $fixtures['communications'];
+    $db->communications->insertOne($correctionNotice);
+    rejected(fn() => $db->communications->updateOne(['_id' => $correctionNotice['_id']], ['$set' => ['kind' => 'LEMBRETE']]), 121);
+    rejected(fn() => $db->communications->updateOne(['_id' => $correctionNotice['_id']], ['$set' => ['correction_of_id' => 'x']]), 121);
+    $db->mail_queue->insertOne(['communication_id' => $correctionNotice['_id'], 'recipient' => 'shared@example.org',
+        'subject' => 'Correção', 'body' => '', 'status' => 'CANCELADO', 'created_at' => $now]);
+    $db->push_queue->insertOne(['communication_id' => $communicationId, 'guardian_id' => $guardianId, 'title' => 'Aviso',
+        'body' => '', 'url' => '', 'status' => 'CANCELADO', 'created_at' => $now, 'fallback_email' => null,
+        'base_url' => null, 'reminder_due_at' => null]);
+    rejected(fn() => $db->push_queue->updateOne(['communication_id' => $communicationId], ['$set' => ['status' => 'CANCELADA']]), 121);
+    rejected(fn() => $db->mail_queue->updateOne(['communication_id' => $correctionNotice['_id']], ['$set' => ['status' => 'CANCELADA']]), 121);
+
     // Bootstrap deve recusar legado incompatível, sem apagá-lo.
     $db->command(['collMod' => 'operation_logs', 'validationLevel' => 'off'])->toArray();
     $db->operation_logs->insertOne(['legacy_invalid' => true]);

@@ -14,7 +14,12 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <title><?= e($pageTitle) ?> · Presença</title>
     <link rel="stylesheet" href="/assets/app.css">
+    <link rel="stylesheet" href="/assets/chamada.css">
+    <link rel="stylesheet" href="/assets/frequencia.css">
+    <link rel="stylesheet" href="/assets/ocorrencias.css">
     <script src="/assets/push.js" defer></script>
+    <script src="/assets/chamada.js" defer></script>
+    <script src="/assets/frequencia.js" defer></script>
 </head>
 <body>
 <header class="site-header">

@@ -20,6 +20,8 @@ final class Schema
         $nullableId = ['bsonType' => ['objectId', 'null']];
         $active = ['bsonType' => 'bool'];
         $enum = static fn(array $values): array => ['bsonType' => 'string', 'enum' => $values];
+        // Motivo de uma falta desfeita (mesmo limite validado em MongoAbsenceCancellation).
+        $cancelReason = ['bsonType' => 'string', 'maxLength' => 300];
         $schema = static function (array $required, array $properties): array {
             return [
                 'bsonType' => 'object',
@@ -78,6 +80,19 @@ final class Schema
                     ],
                     'roster_hash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
                     'status' => $enum(['PROCESSANDO', 'CONCLUIDA']),
+                    // Faltas desfeitas depois da chamada: a entrada do aluno volta a PRESENTE.
+                    'corrections' => [
+                        'bsonType' => 'array',
+                        'items' => [
+                            'bsonType' => 'object',
+                            'required' => ['student_id', 'absence_id', 'from', 'to', 'by', 'at', 'reason'],
+                            'properties' => [
+                                'student_id' => $id, 'absence_id' => $id,
+                                'from' => $enum(['AUSENTE']), 'to' => $enum(['PRESENTE']),
+                                'by' => $id, 'at' => $date, 'reason' => $cancelReason,
+                            ],
+                        ],
+                    ],
                 ]
             ),
             Collections::LEGACY_ATTENDANCE_SESSIONS => $schema(
@@ -97,13 +112,19 @@ final class Schema
                  'attendance_session_id' => $nullableId,
                  'legacy_attendance_session_id' => $nullableId,
                  'absence_date' => ['bsonType' => 'string', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'],
-                 'status' => $enum(['PENDENTE', 'RESPONDIDA']), 'registered_by' => $id, 'created_at' => $date,
-                 'class_snapshot_source' => $enum(['captured', 'legacy_backfill', 'unknown'])]
+                 'status' => $enum(['PENDENTE', 'RESPONDIDA', 'CANCELADA']), 'registered_by' => $id, 'created_at' => $date,
+                 'class_snapshot_source' => $enum(['captured', 'legacy_backfill', 'unknown']),
+                 // Falta desfeita (registrada por engano): quem desfez, quando e por quê.
+                 'cancelled_at' => $nullableDate, 'cancelled_by' => $nullableId, 'cancel_reason' => $cancelReason]
             ),
             Collections::COMMUNICATIONS => $schema(
                 ['absence_id', 'guardian_id', 'email_to', 'token_hash', 'status', 'created_at'],
                 ['absence_id' => $id, 'guardian_id' => $id, 'email_to' => $text, 'token_hash' => $text,
-                 'status' => $enum(['PENDENTE', 'ENVIADO', 'FALHA']), 'created_at' => $date,
+                 'status' => $enum(['PENDENTE', 'ENVIADO', 'FALHA', 'CANCELADA']), 'created_at' => $date,
+                 // Ausente nas comunicações antigas, que são sempre avisos. CORRECAO: e-mail que desmente
+                 // o aviso de uma falta desfeita (correction_of_id aponta o aviso original).
+                 'kind' => $enum(['AVISO', 'CORRECAO']), 'correction_of_id' => $nullableId,
+                 'cancelled_at' => $nullableDate,
                  'sent_at' => $nullableDate, 'expires_at' => $nullableDate, 'retry_of_id' => $nullableId,
                  // Marca a comunicação com falha que já ganhou reenvio (trava contra cliques duplicados).
                  'retried_at' => $nullableDate,
@@ -116,7 +137,7 @@ final class Schema
             Collections::MAIL_QUEUE => $schema(
                 ['communication_id', 'recipient', 'subject', 'body', 'status', 'created_at'],
                 ['communication_id' => $id, 'recipient' => $text, 'subject' => $text, 'body' => $text,
-                 'status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'FALHA', 'QUARENTENA']),
+                 'status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'FALHA', 'QUARENTENA', 'CANCELADO']),
                  'created_at' => $date, 'started_at' => $nullableDate, 'processed_at' => $nullableDate,
                  'next_attempt_at' => $nullableDate, 'claim_id' => $nullableId,
                  'attempts' => ['bsonType' => ['int', 'long']]]
@@ -139,7 +160,7 @@ final class Schema
             Collections::PUSH_QUEUE => $schema(
                 ['communication_id', 'guardian_id', 'title', 'body', 'url', 'status', 'created_at'],
                 ['communication_id' => $id, 'guardian_id' => $id, 'title' => $text, 'body' => $text, 'url' => $text,
-                 'status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'ENCAMINHADO_EMAIL']),
+                 'status' => $enum(['AGUARDANDO', 'PROCESSANDO', 'CONCLUIDO', 'ENCAMINHADO_EMAIL', 'CANCELADO']),
                  'fallback_email' => ['bsonType' => ['object', 'null'],
                      'required' => ['recipient', 'subject', 'body'],
                      'properties' => ['recipient' => $text, 'subject' => $text, 'body' => $text]],

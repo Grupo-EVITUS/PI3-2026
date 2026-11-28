@@ -1,16 +1,26 @@
-<?php $pageTitle = 'Justificar ausência'; ?>
+<?php
+// Falta desfeita pela escola: o link continua abrindo, só para avisar que não há o que justificar.
+$cancelled = $absence['absence_status'] === 'CANCELADA';
+$pageTitle = $cancelled ? 'Aviso cancelado' : 'Justificar ausência';
+?>
 <section class="public-intro">
-    <span class="eyebrow">Formulário do responsável</span>
-    <h1>Justificativa de ausência</h1>
-    <p>Confira os dados do comunicado e informe o motivo da ausência.</p>
+    <span class="eyebrow"><?= $cancelled ? 'Comunicado da escola' : 'Formulário do responsável' ?></span>
+    <h1><?= $cancelled ? 'Aviso de ausência cancelado' : 'Justificativa de ausência' ?></h1>
+    <p><?= $cancelled ? 'A escola corrigiu o registro da chamada deste dia.' : 'Confira os dados do comunicado e informe o motivo da ausência.' ?></p>
 </section>
 <section class="card public-card">
     <div class="absence-summary">
         <div><span>Aluno</span><strong><?= e($absence['student_name']) ?></strong></div>
         <div><span>Turma</span><strong><?= e($absence['class_name']) ?></strong></div>
-        <div><span>Data da ausência</span><strong><?= e(date('d/m/Y', strtotime($absence['absence_date']))) ?></strong></div>
+        <div><span><?= $cancelled ? 'Data' : 'Data da ausência' ?></span><strong><?= e(date('d/m/Y', strtotime($absence['absence_date']))) ?></strong></div>
     </div>
-    <?php if ($absence['absence_status'] === 'RESPONDIDA'): ?>
+    <?php if ($cancelled): ?>
+        <div class="notice notice-success public-cancelled" role="status">
+            <strong>Este aviso foi cancelado.</strong>
+            A falta foi registrada por engano: <?= e($absence['student_name']) ?> estava presente.
+            Não é preciso enviar justificativa. Pedimos desculpas pelo transtorno.
+        </div>
+    <?php elseif ($absence['absence_status'] === 'RESPONDIDA'): ?>
         <div class="notice notice-success">Esta ocorrência já foi respondida. O envio de outra justificativa não é permitido.</div>
         <div class="justification-card">
             <span class="status status-respondida">Resposta registrada</span>

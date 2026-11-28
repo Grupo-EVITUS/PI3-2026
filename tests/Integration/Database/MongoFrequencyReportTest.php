@@ -49,6 +49,11 @@ try {
         || $report['classes'][1]['rate'] !== 70.0 || $report['classes'][1]['band'] !== 'red') {
         throw new RuntimeException('Resumo por chamadas concluídas divergente.');
     }
+    // A chamada PROCESSANDO da Turma A não entra na contagem de chamadas da turma.
+    if ($report['classes'][0]['session_count'] !== 10 || $report['classes'][1]['session_count'] !== 10
+        || $report['classes'][0]['total'] !== 30 || $report['classes'][1]['total'] !== 30) {
+        throw new RuntimeException('Contagem de chamadas por turma divergente.');
+    }
     $byStudent = [];
     foreach ($report['students'] as $row) { $byStudent[$row['student_id']] = $row; }
     if ($byStudent[(string)$students[0]]['rate'] !== 90.0
@@ -62,8 +67,20 @@ try {
     $filtered = $reporter->report('2026-10-11', '2026-10-20', $classes[1], $students[2]);
     if ($filtered['summary']['session_count'] !== 10 || $filtered['summary']['total'] !== 10
         || $filtered['summary']['present'] !== 6 || count($filtered['students']) !== 1
-        || $filtered['students'][0]['student_id'] !== (string)$students[2]) {
+        || $filtered['students'][0]['student_id'] !== (string)$students[2]
+        || count($filtered['classes']) !== 1 || $filtered['classes'][0]['session_count'] !== 10) {
         throw new RuntimeException('Filtro por período/turma/aluno ou transferência divergente.');
+    }
+    // Chamadas sem o aluno filtrado não contam para a turma.
+    $db->attendance_sessions->insertOne(['_id' => new ObjectId(), 'class_id' => $classes[1],
+        'attendance_date' => '2026-10-22', 'completed_by' => $actor, 'completed_at' => $now,
+        'class_name' => 'Turma B', 'academic_year' => 2026, 'class_shift' => 'Manhã',
+        'entries' => [['student_id' => $students[0], 'student_name' => 'Aluno 1', 'status' => 'PRESENTE']],
+        'roster_hash' => hash('sha256', 'sem-aluno-3'), 'status' => 'CONCLUIDA']);
+    $withoutStudent = $reporter->report('2026-10-01', '2026-10-31', $classes[1], $students[2]);
+    $allStudents = $reporter->report('2026-10-01', '2026-10-31', $classes[1]);
+    if ($withoutStudent['classes'][0]['session_count'] !== 10 || $allStudents['classes'][0]['session_count'] !== 11) {
+        throw new RuntimeException('Contagem de chamadas da turma com filtro de aluno divergente.');
     }
     $empty = $reporter->report('2026-09-01', '2026-09-30');
     if ($empty['summary']['total'] !== 0 || $empty['summary']['rate'] !== null
@@ -88,7 +105,7 @@ try {
             // Esperado.
         }
     }
-    fwrite(STDOUT, "MongoFrequencyReportTest: períodos, faixas, transferência e ausência de dados passaram.\n");
+    fwrite(STDOUT, "MongoFrequencyReportTest: períodos, faixas, chamadas por turma, transferência e ausência de dados passaram.\n");
 } finally {
     $db->drop();
 }

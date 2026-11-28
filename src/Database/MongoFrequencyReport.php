@@ -78,10 +78,12 @@ final class MongoFrequencyReport
             }
             $sessionCount++;
             $classes[$classKey] ??= ['class_id' => $classKey, 'name' => $session['class_name'],
-                'class_name' => $session['class_name']]
+                'class_name' => $session['class_name'], 'session_count' => 0]
                 + $this->emptyCounts();
             $classes[$classKey]['name'] = $session['class_name'];
             $classes[$classKey]['class_name'] = $session['class_name'];
+            // Com filtro de aluno, conta só as chamadas em que ele aparece (as demais já foram puladas acima).
+            $classes[$classKey]['session_count']++;
             $this->combine($classes[$classKey], $sessionCounts);
             $this->combine($summary, $sessionCounts);
             $sessions[] = ['session_id' => (string)$session['_id'], 'class_id' => $classKey,

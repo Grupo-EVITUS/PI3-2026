@@ -4,6 +4,7 @@ declare(strict_types=1);
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\BulkWriteException;
 use Saa\Database\Mongo;
+use Saa\Database\MongoAbsenceCancellation;
 use Saa\Database\MongoStaffRegistration;
 use Saa\Database\MongoSchoolDirectory;
 use Saa\Database\MongoAttendance;
@@ -268,9 +269,59 @@ if (preg_match('#^/justificar/([A-Za-z0-9_-]+)$#', $path, $matches)) {
     }
     render('justification.php', [
         'absence' => $absence, 'error' => $error, 'reasons' => MongoJustification::REASONS,
-        'pushPanel' => pushPanel('/justificar/' . $token . '/notificacoes'),
+        // Aviso cancelado (falta desfeita): não faz sentido convidar para receber avisos daqui.
+        'pushPanel' => $absence['absence_status'] === 'CANCELADA'
+            ? null : pushPanel('/justificar/' . $token . '/notificacoes'),
         'selectedReason' => is_string($selectedReason) ? $selectedReason : '',
         'explanation' => is_string($explanation) ? $explanation : '',
+    ]);
+    return;
+}
+if (preg_match('#^/ausencias/([a-f0-9]{24})/desfazer$#', $path, $undoMatch) === 1) {
+    // Confirmação sem JavaScript: GET mostra o que vai acontecer; POST desfaz a falta.
+    Auth::requireRole(['AOE', 'COORDENACAO']);
+    $actor = activeStaffId(['AOE', 'COORDENACAO']);
+    header('Cache-Control: no-store');
+    $database = Mongo::database();
+    $absenceId = new ObjectId($undoMatch[1]);
+    $absence = (new MongoOccurrences($database))->detail($absenceId);
+    if ($absence === null) {
+        notFound();
+    }
+    $back = $absence['attendance_session_id'] !== null
+        ? '/chamada/' . $absence['attendance_session_id'] : '/ausencias/' . $absence['id'];
+    $cancellation = new MongoAbsenceCancellation($database);
+    $reason = '';
+    $error = null;
+    if ($method === 'POST') {
+        requirePost();
+        try {
+            $reason = $_POST['reason'] ?? '';
+            if (!is_string($reason)) {
+                $reason = '';
+                throw new InvalidArgumentException('Motivo inválido.');
+            }
+            $result = $cancellation->cancel($actor, $absenceId, $reason);
+            flash(sprintf(
+                'Falta desfeita. %d aviso(s) cancelado(s) antes do envio e %d e-mail(s) de correção enviado(s) aos responsáveis.',
+                $result['cancelled_notices'], $result['corrections']
+            ));
+            Auth::redirect($result['attendance_session_id'] !== null
+                ? '/chamada/' . $result['attendance_session_id'] : '/ausencias/' . $result['absence_id']);
+        } catch (DomainException $caught) {
+            flash($caught->getMessage(), 'error');
+            Auth::redirect($back);
+        } catch (InvalidArgumentException $caught) {
+            http_response_code(422);
+            $error = $caught->getMessage();
+        }
+    } elseif ($absence['status'] === 'CANCELADA') {
+        flash('Esta falta já foi desfeita.', 'warning');
+        Auth::redirect($back);
+    }
+    render('absence_undo.php', [
+        'absence' => $absence, 'preview' => $cancellation->preview($absenceId), 'reason' => $reason,
+        'error' => $error, 'back' => $back,
     ]);
     return;
 }
@@ -297,7 +348,7 @@ if ($path === '/ocorrencias' || preg_match('#^/ausencias/([a-f0-9]{24})$#', $pat
         }
         $classId = $filters['turma_id'] === '' ? null : Bson::objectId($filters['turma_id']);
         $studentId = $filters['aluno_id'] === '' ? null : Bson::objectId($filters['aluno_id']);
-        if (!in_array($filters['status'], ['', 'PENDENTE', 'RESPONDIDA'], true)
+        if (($filters['status'] !== '' && !in_array($filters['status'], MongoOccurrences::STATUSES, true))
             || ($filters['turma_id'] !== '' && $classId === null)
             || ($filters['aluno_id'] !== '' && $studentId === null)) {
             http_response_code(422);
@@ -400,11 +451,36 @@ if ($path === '/chamada') {
         $result = (new MongoAttendance(Mongo::database()))->record(
             $actor, $classId, $attendance, $date, baseUrl()
         );
-        render('mongo_attendance_result.php', ['result' => $result, 'date' => $date]);
     } catch (InvalidArgumentException|DomainException $error) {
         http_response_code(422);
         renderMongoAttendance($error->getMessage(), is_array($_POST['attendance'] ?? null) ? $_POST['attendance'] : []);
+        return;
     }
+    // Post/Redirect/Get: recarregar o resumo não reenvia a chamada.
+    $counts = $result['attendance_counts'];
+    flash(sprintf(
+        'Chamada registrada: %d presente(s) e %d ausente(s). %d comunicação(ões) aguardam na fila: %d por notificação push'
+            . ' e %d por e-mail. O registro não envia avisos diretamente: eles saem pela fila em instantes.'
+            . ' Acompanhe abaixo a situação de cada aviso.',
+        $counts['present'], $counts['absent'], $result['notifications'], $result['push_notifications'],
+        $result['notifications'] - $result['push_notifications']
+    ));
+    Auth::redirect('/chamada/' . $result['attendance_session_id']);
+}
+if (preg_match('#^/chamada/([a-f0-9]{24})$#', $path, $attendanceMatch) === 1) {
+    Auth::requireRole(['AOE', 'COORDENACAO']);
+    if ($method !== 'GET') {
+        http_response_code(405);
+        header('Allow: GET');
+        return;
+    }
+    activeStaffId(['AOE', 'COORDENACAO']);
+    header('Cache-Control: no-store');
+    $summary = (new MongoOccurrences(Mongo::database()))->attendanceSummary(new ObjectId($attendanceMatch[1]));
+    if ($summary === null) {
+        notFound();
+    }
+    render('mongo_attendance_result.php', ['summary' => $summary]);
     return;
 }
 if ($path === '/frequencia' && $method === 'GET') {

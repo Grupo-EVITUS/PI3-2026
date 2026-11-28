@@ -54,7 +54,7 @@ try {
         || $byStudent['Alice']['status'] !== 'PENDENTE' || $byStudent['Alice']['reason'] !== null) {
         throw new RuntimeException('A listagem não reflete ausências e comunicações.');
     }
-    if (count($service->list('PENDENTE')) !== 2 || $service->list('RESPONDIDA') !== []) {
+    if (count($service->list('PENDENTE')) !== 2 || $service->list('RESPONDIDA') !== [] || $service->list('CANCELADA') !== []) {
         throw new RuntimeException('O filtro por status falhou.');
     }
     expectThrows(InvalidArgumentException::class, fn() => $service->list('$ne'), 'Status arbitrário foi aceito.');

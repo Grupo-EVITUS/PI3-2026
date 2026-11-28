@@ -11,9 +11,15 @@ use MongoDB\Driver\Exception\BulkWriteException;
 use MongoDB\Driver\Session;
 use function MongoDB\with_transaction;
 
-/** O token da comunicação é a única credencial da página do responsável. */
+/**
+ * O token da comunicação é a única credencial da página do responsável.
+ * O link de uma falta desfeita continua abrindo, mas só para dizer que o aviso foi cancelado.
+ */
 final class MongoJustification
 {
+    public const CANCELLED_MESSAGE = 'Este aviso foi cancelado pela escola: a falta foi registrada por engano. '
+        . 'Não é preciso enviar justificativa.';
+
     /** Código gravado no banco => rótulo exibido. */
     public const REASONS = [
         'DOENCA' => 'Doença',
@@ -38,8 +44,9 @@ final class MongoJustification
     private function lookup(string $token, ?Session $session = null): ?array
     {
         $options = $session === null ? [] : ['session' => $session];
+        // A correção de falta desfeita não leva link; o filtro por tipo é só uma garantia a mais.
         $communication = $this->database->communications->findOne(
-            ['token_hash' => hash('sha256', $token), 'status' => 'ENVIADO'], $options
+            ['token_hash' => hash('sha256', $token), 'status' => 'ENVIADO', 'kind' => ['$ne' => 'CORRECAO']], $options
         );
         if ($communication === null || (isset($communication['expires_at'])
             && $communication['expires_at'] instanceof UTCDateTime
@@ -76,6 +83,8 @@ final class MongoJustification
             'explanation' => $justification['explanation'] ?? null,
             'submitted_at' => isset($justification['submitted_at'])
                 ? $justification['submitted_at']->toDateTime()->format('Y-m-d H:i:s') : null,
+            'cancelled_at' => ($absence['cancelled_at'] ?? null) instanceof UTCDateTime
+                ? $absence['cancelled_at']->toDateTime()->format('Y-m-d H:i:s') : null,
         ];
     }
 
@@ -101,6 +110,9 @@ final class MongoJustification
                 $absence = $this->lookup($token, $session);
                 if ($absence === null) {
                     throw new InvalidArgumentException('Este link é inválido ou não está mais disponível.');
+                }
+                if ($absence['absence_status'] === 'CANCELADA') {
+                    throw new DomainException(self::CANCELLED_MESSAGE);
                 }
                 if ($absence['absence_status'] !== 'PENDENTE') {
                     throw new DomainException('Esta ausência já foi respondida.');

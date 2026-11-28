@@ -25,6 +25,19 @@ final class MongoAttendance
     }
 
     /**
+     * Impressão digital do roster, na ordem das entradas; recalculada quando uma falta é desfeita.
+     *
+     * @param list<array{student_id: ObjectId, status: string}> $entries
+     */
+    public static function rosterHash(array $entries): string
+    {
+        $hashInput = array_map(static fn(array $entry): array => [
+            (string)$entry['student_id'], $entry['status'],
+        ], $entries);
+        return hash('sha256', json_encode($hashInput, JSON_THROW_ON_ERROR));
+    }
+
+    /**
      * @param array<string, string> $studentStatuses IDs hexadecimais de alunos => PRESENTE|AUSENTE
      * @return array{attendance_session_id: string, attendance_counts: array{present: int, absent: int, total: int}, without_guardians: list<string>, notifications: int, push_notifications: int}
      */
@@ -99,10 +112,7 @@ final class MongoAttendance
                 }
                 $sessionId = new ObjectId();
                 $now = new UTCDateTime();
-                $hashInput = array_map(static fn(array $entry): array => [
-                    (string)$entry['student_id'], $entry['status'],
-                ], $entries);
-                $hash = hash('sha256', json_encode($hashInput, JSON_THROW_ON_ERROR));
+                $hash = self::rosterHash($entries);
                 $this->database->attendance_sessions->insertOne([
                     '_id' => $sessionId, 'class_id' => $classId, 'attendance_date' => $attendanceDate,
                     'completed_by' => $actor, 'completed_at' => $now, 'class_name' => $class['name'],

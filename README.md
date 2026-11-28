@@ -2,6 +2,8 @@
 
 Aplicação web em **PHP, HTML e CSS** com **MongoDB** para registrar a chamada escolar, avisar os responsáveis por **notificação push (PWA) ou e-mail** e acompanhar justificativas e frequência. A equipe usa telas com login; o responsável responde por um link individual, sem conta.
 
+O [planejamento e as revisões das seis sprints](DOC/Documentos/Sprint/README.md) registram a evolução do projeto e as evidências da entrega.
+
 ## Requisitos
 
 ### Execução local com Docker

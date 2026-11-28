@@ -1,6 +1,6 @@
 # Sprints do SAA
 
-Índice dos documentos de planejamento e review. Os nomes de pasta foram padronizados como `S1` a `S6` (a grafia `sprint-1` a `sprint-6` nos links anteriores não correspondia aos diretórios existentes).
+Índice de planejamento e reviews, da Sprint 1 à Sprint 6.
 
 | Sprint | Planejamento | Review |
 |---|---|---|
@@ -13,4 +13,4 @@
 
 Documentos de apoio: [review consolidada](../review.md), [mapa das sprints](../MAPA_SPRINTS.md), [rastreabilidade](RASTREABILIDADE.md), [pendências](PENDENCIAS.md).
 
-**Nota:** os documentos mais antigos incluem propostas Flask/MongoDB. A referência auditada contém um MVP executável em PHP/SQLite; a `main` atual também contém componentes MongoDB em migração por etapas. Consultar o [README principal](../../../../README.md) e os commits citados na rastreabilidade. Um item só deve aparecer como homologado com evidência de execução e aceite.
+Os planos iniciais descrevem a proposta Flask/MongoDB e o MVP de outubro usava PHP/SQLite. A versão verificada em 28/11 usa PHP, MongoDB e Docker Compose. Consulte o [README principal](../../../../README.md) para executar o sistema e as reviews das Sprints 5 e 6 para consultar testes e pendências de aceite.

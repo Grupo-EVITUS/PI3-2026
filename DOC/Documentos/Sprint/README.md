@@ -1,14 +1,13 @@
-# Documentação de sprints — Sistema de Ausência de Alunos (SAA)
+# Documentação de sprints do SAA
 
-Esta pasta contém o **planejamento, as revisões e a rastreabilidade** das seis sprints do projeto PI3-2026 do Grupo EVITUS. Ela não contém uma segunda aplicação executável.
+Esta pasta reúne o **planejamento, as revisões e a rastreabilidade** das seis sprints do projeto PI3-2026 do Grupo EVITUS.
 
 ## Ponto de referência
 
 - Repositório: https://github.com/Grupo-EVITUS/PI3-2026
-- Referência auditada: branch `main`, commit [`a0e7781`](https://github.com/Grupo-EVITUS/PI3-2026/commit/a0e7781652ca76800add049e791f200fb3996c6a) (28/10/2026).
-- Na referência auditada de 28/10, a implementação executável era **PHP 8.1+, HTML/CSS e SQLite**, com fila de e-mails e testes escritos em PHP. A `main` atual também contém componentes MongoDB em migração por etapas. Consultar o [README principal](../../../README.md).
-- Documentos históricos das Sprints 2 a 4 descrevem uma proposta **Flask + MongoDB**, conservada como histórico de planejamento. Não devem ser utilizados para descrever a arquitetura atualmente executável.
-- A existência de código ou teste automatizado não equivale à homologação. Nenhuma execução local foi comprovada nesta revisão documental.
+- O planejamento das primeiras sprints previa **Flask e MongoDB**. O MVP auditado no commit [`a0e7781`](https://github.com/Grupo-EVITUS/PI3-2026/commit/a0e7781652ca76800add049e791f200fb3996c6a), de 28/10/2026, usava **PHP e SQLite**.
+- A versão verificada em 28/11/2026 usa **PHP, MongoDB e Docker Compose**. As instruções de execução estão no [README principal](../../../README.md).
+- As [evidências de integração](sprints/S5/review.md) e a [situação da entrega](sprints/S6/review.md) registram as verificações posteriores ao calendário original. A apresentação ocorreu em 27/11/2026. O feedback e o aceite formal aguardam registro da equipe.
 
 ## Onde encontrar
 

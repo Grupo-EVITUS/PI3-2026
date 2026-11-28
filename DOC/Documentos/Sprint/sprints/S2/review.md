@@ -15,7 +15,7 @@
 
 ## Incremento e decisão técnica
 
-O planejamento histórico adotou Flask/MongoDB, Docker, link temporário de uso único e perfis `AOE`, `COORDINATION` e `ADMIN`. **Na `main` atual**, o código utiliza PHP/SQLite, `AOE`, `COORDENACAO` e `DIRETOR`; links públicos são individuais e a primeira justificativa encerra a ocorrência, mas os tokens não expiram por padrão. Registrar a mudança de arquitetura no histórico em vez de atribuir as duas implementações à mesma entrega.
+O planejamento histórico adotou Flask/MongoDB, Docker, link temporário de uso único e perfis `AOE`, `COORDINATION` e `ADMIN`. O MVP de outubro usava PHP/SQLite e os perfis `AOE`, `COORDENACAO` e `DIRETOR`. Já tinha links individuais e a primeira justificativa encerrava a ocorrência. A [arquitetura da chamada em MongoDB](../../../ARQUITETURA_CHAMADA_MONGODB.md) descreve a evolução posterior.
 
 ## Feedback de stakeholders
 

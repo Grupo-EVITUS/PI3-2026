@@ -2,7 +2,7 @@
 
 **Período:** 20/09/2026 a 26/09/2026  
 **Objetivo histórico:** especificar requisitos não funcionais, modelo de dados, diagrama de classes e protótipo de login.  
-**Nota de arquitetura:** a proposta original era **Flask/MongoDB**. O MVP executável da `main`, versionado em 27/10, utiliza **PHP/SQLite**. Não atribuir entregas do código de 27/10 à janela de setembro sem evidência adicional.
+**Nota de arquitetura:** a proposta original era **Flask/MongoDB**. O MVP versionado em 27/10 usava **PHP/SQLite**. A [arquitetura da versão de entrega](../../../ARQUITETURA_CHAMADA_MONGODB.md) documenta a implementação posterior em PHP e MongoDB.
 
 ## 1. Backlog real do GitHub
 
@@ -15,7 +15,7 @@
 
 ## 2. Requisitos não funcionais definidos
 
-| Código | Requisito | Como verificar na versão atual |
+| Código | Requisito | Evidência ou verificação prevista no recorte de outubro |
 |---|---|---|
 | RNF-01 | Senhas com hash seguro | `password_hash`/`password_verify` em `src/Services.php` e `public/index.php` |
 | RNF-02 | Sessão e perfis no acesso interno | `src/Auth.php`, rotas PHP |
@@ -32,9 +32,9 @@ Requisitos históricos para agregações MongoDB, webhook de abertura de e-mail,
 
 ## 3. Modelo de dados e evolução
 
-O plano histórico MongoDB usava `students`, `enrollments`, `attendance_records`, `guardians`, `justifications`, `justification_links`, `email_notifications`, `audit_events` e `attendance_policies`. Na versão executável, o esquema efetivo está em [`migrations/001_initial.sql`](../../../../../migrations/001_initial.sql), com tabelas relacionais `users`, `classes`, `students`, `guardians`, `student_guardians`, `absences`, `communications`, `mail_queue`, `justifications` e `operation_logs`.
+O plano histórico MongoDB usava `students`, `enrollments`, `attendance_records`, `guardians`, `justifications`, `justification_links`, `email_notifications`, `audit_events` e `attendance_policies`. O MVP de outubro usava o [esquema SQLite do commit `273a2cf`](https://github.com/Grupo-EVITUS/PI3-2026/blob/273a2cf1a49da724159ed279383a74312376829d/migrations/001_initial.sql), com as tabelas `users`, `classes`, `students`, `guardians`, `student_guardians`, `absences`, `communications`, `mail_queue`, `justifications` e `operation_logs`. As coleções e validações da versão atual estão em [`src/Database/Collections.php`](../../../../../src/Database/Collections.php).
 
-Diferenças importantes: o aluno aponta diretamente para uma turma no MVP PHP, sem coleção/tabela histórica `enrollments`; só são registradas **ausências diárias**, não presenças `PRESENT`/`ABSENT`; o dashboard de frequência não está implementado.
+No MVP SQLite de outubro, o aluno apontava diretamente para uma turma, eram registradas apenas ausências diárias e o dashboard de frequência ainda não estava implementado.
 
 ## 4. Diagrama e protótipo
 

@@ -28,8 +28,8 @@ Os três commits são posteriores ao período da sprint e **não comprovam demon
 
 ## Feedback e aceite
 
-Não consta registro de apresentação, feedback formal ou evidências de teste executado para esta review. Os casos de teste escritos em `tests/run.php` devem ser executados e os resultados anexados posteriormente, sem retroagir datas.
+Não consta registro de apresentação, feedback formal ou execução de testes nesta review histórica. Os testes do MVP SQLite ficavam em `tests/run.php`. As evidências posteriores da versão PHP/MongoDB estão na [review da Sprint 5](../S5/review.md).
 
 ## Próximos passos
 
-Consolidar backlog da Sprint 4 com números de issues corretos, criar dashboard e gráficos conforme escopo acordado e verificar o fluxo de comunicação com SMTP real.
+O plano para a Sprint 4 previa consolidar o backlog, desenvolver o dashboard e os gráficos e verificar o fluxo de comunicação com SMTP real. Consulte a [review consolidada](../../review.md) para a situação na data do encerramento.

@@ -2,7 +2,7 @@
 
 **Período planejado:** 04/10/2026 a 10/10/2026  
 **Objetivo:** ampliar o controle gerencial, justificativas, gráficos, consulta de ocorrências e permissões.  
-**Nota:** o escopo original pressupunha Flask/MongoDB. A `main` atual contém um MVP PHP/SQLite, versionado em 27/10.
+**Nota histórica:** o escopo original pressupunha Flask/MongoDB. O MVP versionado em 27/10 usava PHP/SQLite. A [review consolidada](../../review.md) registra o estado posterior das funcionalidades gerenciais.
 
 ## Backlog corrigido conforme as issues REAIS
 

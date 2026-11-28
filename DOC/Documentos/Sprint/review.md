@@ -1,21 +1,32 @@
 # Revisões consolidadas das Sprints 1–6 — SAA
 
-**Conferência documental:** 04/11/2026, branch `main`, commit `a0e7781` (28/10). Esta consolidação distingue evidências históricas, implementação posterior e pendências de teste.
+**Conferência documental inicial em 04/11/2026.** A referência foi o commit `a0e7781` de 28/10. A atualização de **28/11/2026** inclui os registros posteriores à conferência e aos períodos planejados das sprints.
 
 ## Visão geral
 
 | Sprint | Situação da documentação | Evidência verificável / ressalva |
 |---|---|---|
 | [1](sprints/S1/review.md) | Descoberta declarada como concluída | Issues #3, #4, #5, #7, #8 e #9 fechadas após a review de 19/09 |
-| [2](sprints/S2/review.md) | Especificação histórica | Issue #10 fechada; #18, #20, #21 abertas; Flask/MongoDB é proposta antiga |
-| [3](sprints/S3/review.md) | Implementação histórica planejada | Código equivalente parcialmente versionado somente em 27/10 (PHP/SQLite); sem evidência de review naquela data |
-| [4](sprints/S4/review.md) | Funcionalidades gerenciais planejadas | Parte implementada em PHP em 27/10; dashboard e gráficos não encontrados |
-| [5](sprints/S5/review.md) | Integração/homologação em andamento em 04/11 | Testes escritos, sem execução/homologação comprovada |
-| [6](sprints/S6/review.md) | Futura em 04/11 | Documentos são planejamento, não resultado |
+| [2](sprints/S2/review.md) | Especificação histórica | Na consulta de 04/11, a issue #10 estava fechada e #18, #20 e #21 estavam abertas |
+| [3](sprints/S3/review.md) | Implementação histórica planejada | Parte das funcionalidades apareceu no MVP PHP/SQLite de 27/10. A review da janela de setembro e início de outubro permanece sem confirmação |
+| [4](sprints/S4/review.md) | Funcionalidades gerenciais planejadas | Parte das funções aparece no MVP de 27/10. O dashboard de frequência e os gráficos têm evidência de implementação em novembro |
+| [5](sprints/S5/review.md) | Integração e testes | Em andamento na auditoria de 04/11. A validação local de 28/11 registrou resultados posteriores ao período planejado da sprint |
+| [6](sprints/S6/review.md) | Documentação e entrega | Apresentação realizada em 27/11. A versão publicada e testada localmente em 28/11 está registrada abaixo. Feedback e aceite seguem pendentes |
 
-## Mudança arquitetural registrada
+## Histórico e versão atual
 
-Documentos produzidos para a hipótese inicial **Flask + MongoDB + Docker** convivem com a implementação **PHP 8.1 + SQLite + HTML/CSS** dos commits de 27/10. A versão atual não possui, no PHP, dashboard de frequência com gráficos nem webhook de leitura de e-mails. Tokens de justificativa são individuais e guardados em hash, mas sem expiração configurada por padrão na v1.
+A proposta inicial previa Flask e MongoDB. O MVP de 27/10 usava PHP, SQLite e HTML/CSS. A versão publicada em 28/11 usa **PHP com MongoDB** e oferece execução local com **Docker Compose**, incluindo os processos de e-mail e push. O dashboard de frequência apresenta gráficos, incluindo a pizza de presença por turma. [README principal](../../../README.md), [`08edb5a`](https://github.com/Grupo-EVITUS/PI3-2026/commit/08edb5ae50725bb7c1d45c331b68507027b15f6f), [`68c7942`](https://github.com/Grupo-EVITUS/PI3-2026/commit/68c7942dac9845f411762b05ff18c8fc85a7ec91).
+
+## Validação local em 28/11/2026
+
+| Verificação | Resultado |
+|---|---|
+| Subida do ambiente Docker | Aplicação e serviços locais iniciados |
+| E-mail e justificativa | Mensagem recebida no Mailpit e justificativa registrada pelo link |
+| Push | O teste de integração passou com entrega cifrada no serviço simulado e justificativa pelo link. Em teste anterior, o serviço real aceitou o envio |
+| Entrega ao destinatário | Entrega na caixa do Gmail e exibição do push no aparelho permanecem sem confirmação |
+
+A apresentação ocorreu em 27/11, conforme informado pela equipe. Permanecem por registrar o commit apresentado, o feedback, o aceite e a data oficial de encerramento da Sprint 6. O mapa usa 16/11 provisoriamente e registra a divergência com 14/11 no plano anterior. A issue #35 foi fechada em 28/11 e está sem comentários. [Issue #35](https://github.com/Grupo-EVITUS/PI3-2026/issues/35) · [Mapa das sprints](MAPA_SPRINTS.md)
 
 ## Commits principais
 
@@ -23,9 +34,12 @@ Documentos produzidos para a hipótese inicial **Flask + MongoDB + Docker** conv
 2. [`c858e30`](https://github.com/Grupo-EVITUS/PI3-2026/commit/c858e30427444226e645df0a9777760a94804e60), 27/10: interface e fluxos de ausência/justificativa.
 3. [`260a850`](https://github.com/Grupo-EVITUS/PI3-2026/commit/260a85086e8fa102b4942b7c7b26c39ca87a043c), 27/10: fila de e-mail e testes escritos.
 4. [`a0e7781`](https://github.com/Grupo-EVITUS/PI3-2026/commit/a0e7781652ca76800add049e791f200fb3996c6a), 28/10: inclusão dos documentos de sprint.
+5. [`08edb5a`](https://github.com/Grupo-EVITUS/PI3-2026/commit/08edb5ae50725bb7c1d45c331b68507027b15f6f), 28/11: ajustes de chamada, opção de desfazer falta e gráfico de presença por turma.
+6. [`68c7942`](https://github.com/Grupo-EVITUS/PI3-2026/commit/68c7942dac9845f411762b05ff18c8fc85a7ec91), 28/11: execução local com Docker e aplicação da marca SAA.
+7. [`5dbe123`](https://github.com/Grupo-EVITUS/PI3-2026/commit/5dbe12312e8696af30f2ef8d9c5d40753ad8dbf2), 28/11: remoção do ZIP antigo e da pasta de relatórios de teste.
 
 ## Correções de rastreabilidade
 
-Os arquivos anteriores da Sprint 3 utilizavam `#31–#39` para tarefas diferentes das issues reais. Os da Sprint 4 utilizavam `#41–#46` para dashboard, justificativas, gráficos, consulta, perfis e login. A correspondência correta deste segundo grupo é **#46, #47, #48, #49, #50, #21**. As referências `#51–#66` das Sprints 5 e 6 não existem; foram substituídas por identificadores internos.
+Os arquivos anteriores da Sprint 3 utilizavam `#31–#39` para tarefas diferentes das issues registradas. Na Sprint 4, dashboard, justificativas, gráficos, consulta, perfis e login correspondem historicamente a **#46, #47, #48, #49, #50 e #21**. Em 28/11, o título registrado para a issue #46 era **Migrar o SAA para MongoDB, chamada completa e relatórios**. Os itens de planejamento das Sprints 5 e 6 usam identificadores internos. [Issue #46](https://github.com/Grupo-EVITUS/PI3-2026/issues/46).
 
-Ver a tabela de rastreabilidade em [RASTREABILIDADE.md](sprints/RASTREABILIDADE.md) e as [pendências](sprints/PENDENCIAS.md). Não confundir um teste escrito com um teste executado ou uma issue aberta com uma entrega homologada.
+Os registros detalhados estão na [rastreabilidade](sprints/RASTREABILIDADE.md) e nas [pendências](sprints/PENDENCIAS.md).

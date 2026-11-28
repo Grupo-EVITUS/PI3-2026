@@ -25,10 +25,9 @@ button, input, select, textarea { font: inherit; }
 button, select { cursor: pointer; }
 .site-header { min-height: 76px; display: flex; align-items: center; gap: 38px; padding: 12px clamp(18px, 5vw, 72px); background: #fff; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 205px; }
-.brand-mark { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 13px; color: #fff; background: var(--teal); font-weight: 800; font-size: 20px; }
-.brand strong, .brand small, .user-label small { display: block; }
-.brand strong { font-size: 16px; letter-spacing: -.03em; }
-.brand small, .user-label small { color: var(--muted); font-size: 11px; }
+.brand-mark { display: grid; flex: none; width: 40px; height: 40px; place-items: center; border-radius: 13px; color: #fff; background: var(--teal); font-weight: 800; font-size: 13px; }
+.brand strong { font-size: 14px; letter-spacing: -.02em; }
+.user-label small { display: block; color: var(--muted); font-size: 11px; }
 .main-nav { display: flex; align-items: center; gap: 26px; flex: 1; }
 .main-nav a { color: #52696e; font-weight: 600; font-size: 13px; }
 .main-nav a:hover, .text-link:hover { color: var(--teal); }

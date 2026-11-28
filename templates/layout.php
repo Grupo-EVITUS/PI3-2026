@@ -24,8 +24,8 @@ $profileLabels = ['AOE' => 'AOE', 'COORDENACAO' => 'Coordenação', 'DIRETOR' =>
 <body>
 <header class="site-header">
     <a class="brand" href="<?= isset($_SESSION['user_id']) ? staffHomePath() : '/login' ?>">
-        <span class="brand-mark" aria-hidden="true">P</span>
-        <span><strong>Presença</strong><small>Comunicação escolar</small></span>
+        <span class="brand-mark">SAA</span>
+        <strong>Comunicação escolar</strong>
     </a>
     <?php if (!empty($_SESSION['user_id'])): ?>
         <nav class="main-nav" aria-label="Navegação principal">

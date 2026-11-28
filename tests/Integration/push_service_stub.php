@@ -5,6 +5,11 @@ declare(strict_types=1);
 // Grava cada entrega em PUSH_STUB_DIR; endpoints /push/gone-* respondem 410 como uma inscrição extinta.
 $directory = getenv('PUSH_STUB_DIR');
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($path === '/health' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
+    http_response_code(is_string($directory) && is_writable($directory) ? 204 : 503);
+    return true;
+}
+
 if (!is_string($directory) || !is_dir($directory) || ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST'
     || preg_match('#^/push/([A-Za-z0-9_-]{1,64})$#', $path, $match) !== 1) {
     http_response_code(404);

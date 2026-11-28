@@ -4,6 +4,23 @@ Aplicação web em **PHP, HTML e CSS** com **MongoDB** para registrar a chamada 
 
 ## Requisitos
 
+### Execução local com Docker
+
+```powershell
+docker compose -f docker-compose.saa-mongodb.yml up -d --build --wait
+```
+
+O Compose inicializa o schema, sobe o site em <http://127.0.0.1:8080> e executa os workers de e-mail e push. Na primeira execução, defina `INITIAL_ADMIN_NAME`, `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD` no terminal e crie a conta da Coordenação:
+
+```powershell
+docker compose -f docker-compose.saa-mongodb.yml exec -e INITIAL_ADMIN_NAME -e INITIAL_ADMIN_EMAIL -e INITIAL_ADMIN_PASSWORD app php bin/create_initial_admin_mongodb.php
+Remove-Item Env:INITIAL_ADMIN_PASSWORD
+```
+
+Por padrão, o e-mail fica na caixa local do [Mailpit](http://127.0.0.1:8025). Para entregar numa caixa real, configure `SAA_SMTP_HOST`, `SAA_SMTP_PORT`, `SAA_SMTP_ENCRYPTION`, `SAA_SMTP_USERNAME`, `SAA_SMTP_PASSWORD` e `SAA_MAIL_FROM` no ambiente do Compose e execute o comando de subida novamente. Use como remetente um endereço autorizado pelo provedor. As mensagens do ambiente local têm links para `127.0.0.1`, acessíveis na máquina que roda o projeto.
+
+### Execução sem Docker
+
 - PHP 8.1 ou superior com as extensões `mongodb` (2.5), `mbstring` e `openssl`
 - Composer
 - MongoDB 7 em **replica set** (a chamada e a fila usam transações; um replica set de um nó basta para desenvolvimento)
@@ -166,7 +183,7 @@ php tests/Integration/Database/MongoAttendanceTest.php
 php tests/Unit/Push/WebPushTest.php
 ```
 
-A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.github/workflows/saa-mongodb-foundation.yml`. Para subir um Mongo local: `docker compose -f docker-compose.saa-mongodb.yml up -d --wait` (somente desenvolvimento, sem autenticação). Relatórios de testes manuais da equipe ficam em `DOC/Relatorios-de-Testes/`.
+A lista completa, incluindo os testes HTTP com Mailpit e o do push, está em `.github/workflows/saa-mongodb-foundation.yml`. Para subir apenas o Mongo local: `docker compose -f docker-compose.saa-mongodb.yml up -d --wait mongodb` (somente desenvolvimento, sem autenticação). Relatórios de testes manuais da equipe ficam em `DOC/Relatorios-de-Testes/`.
 
 ## Estrutura
 

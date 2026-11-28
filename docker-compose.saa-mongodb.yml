@@ -9,9 +9,135 @@ services:
         - CMD-SHELL
         - >-
           mongosh --quiet --eval 'try { if (rs.status().myState === 1) quit(0); } catch (e) {}
-          try { rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]}); } catch (e) {}
+          try { rs.initiate({_id:"rs0",members:[{_id:0,host:"mongodb:27017"}]}); } catch (e) {}
           quit(1)'
       interval: 5s
       timeout: 5s
       retries: 30
       start_period: 5s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DB: saa
+      MONGODB_TIMEOUT_MS: 5000
+      PUBLIC_BASE_URL: http://127.0.0.1:8080
+      MAIL_MODE: smtp
+      SMTP_HOST: ${SAA_SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SAA_SMTP_PORT:-1025}
+      SMTP_ENCRYPTION: ${SAA_SMTP_ENCRYPTION:-none}
+      SMTP_USERNAME: ${SAA_SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SAA_SMTP_PASSWORD:-}
+      MAIL_FROM: ${SAA_MAIL_FROM:-saa@example.test}
+      PUSH_ALLOWED_ENDPOINT_PREFIXES: http://push-stub:8766/push/
+      PUSH_STUB_URL: http://push-stub:8766
+    volumes:
+      - vapid_keys:/run/saa-vapid
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    command:
+      - sh
+      - -ec
+      - |
+        umask 077
+        if [ ! -s /run/saa-vapid/keys.env ]; then
+          php bin/generate_vapid_keys.php > /run/saa-vapid/keys.env.tmp
+          mv /run/saa-vapid/keys.env.tmp /run/saa-vapid/keys.env
+        fi
+        set -a
+        . /run/saa-vapid/keys.env
+        set +a
+        unset VAPID_PRIVATE_KEY
+        php bin/init_mongodb.php
+        exec php -S 0.0.0.0:8080 -t /app/public /app/router.php
+    entrypoint: []
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(str_contains((string) @file_get_contents(\"http://127.0.0.1:8080/login\"), \"csrf_token\") ? 0 : 1);'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+  push-stub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PUSH_STUB_DIR: /tmp/push-deliveries
+    command: php -S 0.0.0.0:8766 tests/Integration/push_service_stub.php
+    entrypoint: []
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@file_get_contents(\"http://127.0.0.1:8766/health\") === false ? 1 : 0);'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - push_stub_data:/tmp/push-deliveries
+
+  mail-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DB: saa
+      MONGODB_TIMEOUT_MS: 5000
+      PUBLIC_BASE_URL: http://127.0.0.1:8080
+      MAIL_MODE: smtp
+      SMTP_HOST: ${SAA_SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SAA_SMTP_PORT:-1025}
+      SMTP_ENCRYPTION: ${SAA_SMTP_ENCRYPTION:-none}
+      SMTP_USERNAME: ${SAA_SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SAA_SMTP_PASSWORD:-}
+      MAIL_FROM: ${SAA_MAIL_FROM:-saa@example.test}
+    depends_on:
+      app:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    entrypoint: []
+    command: php bin/process_mail_queue_mongodb.php --watch
+
+  push-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DB: saa
+      MONGODB_TIMEOUT_MS: 5000
+      PUBLIC_BASE_URL: http://127.0.0.1:8080
+      PUSH_ALLOWED_ENDPOINT_PREFIXES: http://push-stub:8766/push/
+    volumes:
+      - vapid_keys:/run/saa-vapid:ro
+    depends_on:
+      app:
+        condition: service_healthy
+      push-stub:
+        condition: service_healthy
+    entrypoint: []
+    command:
+      - sh
+      - -ec
+      - |
+        set -a
+        . /run/saa-vapid/keys.env
+        set +a
+        exec php bin/process_push_queue_mongodb.php --watch
+
+volumes:
+  push_stub_data:
+  vapid_keys:
